@@ -1,0 +1,13 @@
+*.d
+*.o
+*.a
+*PluginInfo.C
+*PluginInfo.h
+CMake*
+cmake*
+Makefile
+*.dSYM
+.*.swp
+commit_info.h
+build_date.h
+.builddir
