@@ -93,6 +93,20 @@ CONTAINS
     io_block_name (c_dump_jx               ) = 'jx'
     io_block_name (c_dump_jy               ) = 'jy'
     io_block_name (c_dump_jz               ) = 'jz'
+#ifdef NONLINEAR_OPTICS
+    io_block_name (c_dump_jx_nlo           ) = 'jx_nlo'
+    io_block_name (c_dump_jy_nlo           ) = 'jy_nlo'
+    io_block_name (c_dump_jz_nlo           ) = 'jz_nlo'
+    io_block_name (c_dump_px_nlo           ) = 'px_nlo'
+    io_block_name (c_dump_py_nlo           ) = 'py_nlo'
+    io_block_name (c_dump_pz_nlo           ) = 'pz_nlo'
+    io_block_name (c_dump_medium_mask      ) = 'medium_mask'
+    io_block_name (c_dump_jx_D             ) = 'jx_D'
+    io_block_name (c_dump_jy_D             ) = 'jy_D'
+    io_block_name (c_dump_jz_D             ) = 'jz_D'
+    io_block_name (c_dump_electron_density_Drude) = 'electron_density_Drude'
+    io_block_name (c_dump_electron_temperature) = 'electron_temperature'
+#endif
     io_block_name (c_dump_ekbar            ) = 'ekbar'
     io_block_name (c_dump_mass_density     ) = 'mass_density'
     io_block_name (c_dump_charge_density   ) = 'charge_density'
@@ -880,6 +894,32 @@ CONTAINS
         IOR(io_block%dumpmask(c_dump_jy), c_io_restartable)
     io_block%dumpmask(c_dump_jz) = &
         IOR(io_block%dumpmask(c_dump_jz), c_io_restartable)
+#ifdef NONLINEAR_OPTICS
+    io_block%dumpmask(c_dump_jx_nlo) = &
+        IOR(io_block%dumpmask(c_dump_jx_nlo), c_io_restartable)
+    io_block%dumpmask(c_dump_jy_nlo) = &
+        IOR(io_block%dumpmask(c_dump_jy_nlo), c_io_restartable)
+    io_block%dumpmask(c_dump_jz_nlo) = &
+        IOR(io_block%dumpmask(c_dump_jz_nlo), c_io_restartable)
+    io_block%dumpmask(c_dump_px_nlo) = &
+        IOR(io_block%dumpmask(c_dump_px_nlo), c_io_restartable)
+    io_block%dumpmask(c_dump_py_nlo) = &
+        IOR(io_block%dumpmask(c_dump_py_nlo), c_io_restartable)
+    io_block%dumpmask(c_dump_pz_nlo) = &
+        IOR(io_block%dumpmask(c_dump_pz_nlo), c_io_restartable)
+    io_block%dumpmask(c_dump_medium_mask) = &
+        IOR(io_block%dumpmask(c_dump_medium_mask), c_io_restartable)
+    io_block%dumpmask(c_dump_jx_D) = &
+        IOR(io_block%dumpmask(c_dump_jx_D), c_io_restartable)
+    io_block%dumpmask(c_dump_jy_D) = &
+        IOR(io_block%dumpmask(c_dump_jy_D), c_io_restartable)
+    io_block%dumpmask(c_dump_jz_D) = &
+        IOR(io_block%dumpmask(c_dump_jz_D), c_io_restartable)
+    io_block%dumpmask(c_dump_electron_density_Drude) = &
+        IOR(io_block%dumpmask(c_dump_electron_density_Drude), c_io_restartable)
+    io_block%dumpmask(c_dump_electron_temperature) = &
+        IOR(io_block%dumpmask(c_dump_electron_temperature), c_io_restartable)
+#endif
     ! CPML boundaries
     io_block%dumpmask(c_dump_cpml_psi_eyx) = &
         IOR(io_block%dumpmask(c_dump_cpml_psi_eyx), c_io_restartable)

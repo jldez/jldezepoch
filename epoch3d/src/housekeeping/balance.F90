@@ -238,12 +238,6 @@ CONTAINS
       y(-2:ny+3) = y_global(ny_global_min-3:ny_global_max+3)
       z(-2:nz+3) = z_global(nz_global_min-3:nz_global_max+3)
 
-      DEALLOCATE(xb, yb, zb)
-      ALLOCATE(xb(-2:nx+3), yb(-2:ny+3), zb(-2:nz+3))
-      xb(-2:nx+3) = xb_global(nx_global_min-3:nx_global_max+3)
-      yb(-2:ny+3) = yb_global(ny_global_min-3:ny_global_max+3)
-      zb(-2:nz+3) = zb_global(nz_global_min-3:nz_global_max+3)
-
       ! Recalculate x_grid_mins/maxs so that rebalancing works next time
       DO iproc = 0, nprocx - 1
         x_grid_mins(iproc) = x_global(cell_x_min(iproc+1))
@@ -425,6 +419,53 @@ CONTAINS
     DEALLOCATE(bz)
     ALLOCATE(bz(-2:nx_new+3, -2:ny_new+3, -2:nz_new+3))
     bz = temp
+
+#ifdef NONLINEAR_OPTICS
+    CALL remap_field(jx_nlo, temp)
+    DEALLOCATE(jx_nlo)
+    ALLOCATE(jx_nlo(-2:nx_new+3, -2:ny_new+3, -2:nz_new+3))
+    jx_nlo = temp
+
+    CALL remap_field(jy_nlo, temp)
+    DEALLOCATE(jy_nlo)
+    ALLOCATE(jy_nlo(-2:nx_new+3, -2:ny_new+3, -2:nz_new+3))
+    jy_nlo = temp
+
+    CALL remap_field(jz_nlo, temp)
+    DEALLOCATE(jz_nlo)
+    ALLOCATE(jz_nlo(-2:nx_new+3, -2:ny_new+3, -2:nz_new+3))
+    jz_nlo = temp
+
+    CALL remap_field(px_nlo, temp)
+    DEALLOCATE(px_nlo)
+    ALLOCATE(px_nlo(-2:nx_new+3, -2:ny_new+3, -2:nz_new+3))
+    px_nlo = temp
+
+    CALL remap_field(py_nlo, temp)
+    DEALLOCATE(py_nlo)
+    ALLOCATE(py_nlo(-2:nx_new+3, -2:ny_new+3, -2:nz_new+3))
+    py_nlo = temp
+
+    CALL remap_field(pz_nlo, temp)
+    DEALLOCATE(pz_nlo)
+    ALLOCATE(pz_nlo(-2:nx_new+3, -2:ny_new+3, -2:nz_new+3))
+    pz_nlo = temp
+
+    CALL remap_field(eps0chi, temp)
+    DEALLOCATE(eps0chi)
+    ALLOCATE(eps0chi(-2:nx_new+3, -2:ny_new+3, -2:nz_new+3))
+    eps0chi = temp
+
+    CALL remap_field(intensity, temp)
+    DEALLOCATE(intensity)
+    ALLOCATE(intensity(-2:nx_new+3, -2:ny_new+3, -2:nz_new+3))
+    intensity = temp
+
+    CALL remap_field(medium_mask, temp)
+    DEALLOCATE(medium_mask)
+    ALLOCATE(medium_mask(-2:nx_new+3, -2:ny_new+3, -2:nz_new+3))
+    medium_mask = temp
+#endif
 
     DO ispecies = 1, n_species
       IF (species_list(ispecies)%migrate%fluid) THEN

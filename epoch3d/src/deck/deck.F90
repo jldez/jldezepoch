@@ -32,6 +32,9 @@ MODULE deck
 #ifdef PHOTONS
   USE photons
 #endif
+#ifdef NONLINEAR_OPTICS
+  USE deck_nonlinear_optics_block
+#endif
   USE deck_qed_block
   ! Initial Condition Blocks
   USE deck_laser_block
@@ -87,6 +90,9 @@ CONTAINS
     CALL io_deck_initialise
     CALL io_global_deck_initialise
     CALL laser_deck_initialise
+#ifdef NONLINEAR_OPTICS
+    CALL nonlinear_optics_deck_initialise
+#endif
     CALL subset_deck_initialise
 #ifndef NO_PARTICLE_PROBES
     CALL probe_deck_initialise
@@ -261,6 +267,11 @@ CONTAINS
     ELSE IF (str_cmp(block_name, 'laser')) THEN
       handle_block = laser_block_handle_element(block_element, block_value)
       RETURN
+#ifdef NONLINEAR_OPTICS
+    ELSE IF (str_cmp(block_name, 'nonlinear_optics')) THEN
+      handle_block = nonlinear_optics_block_handle_element(block_element, block_value)
+      RETURN
+#endif
     ELSE IF (str_cmp(block_name, 'subset')) THEN
       handle_block = &
           subset_block_handle_element(block_element, block_value)
@@ -321,6 +332,9 @@ CONTAINS
     errcode_deck = IOR(errcode_deck, io_block_check())
     errcode_deck = IOR(errcode_deck, io_global_block_check())
     errcode_deck = IOR(errcode_deck, laser_block_check())
+#ifdef NONLINEAR_OPTICS
+    errcode_deck = IOR(errcode_deck, nonlinear_optics_block_check())
+#endif
     errcode_deck = IOR(errcode_deck, subset_block_check())
 #ifndef NO_PARTICLE_PROBES
     errcode_deck = IOR(errcode_deck, probe_block_check())

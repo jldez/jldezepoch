@@ -27,6 +27,8 @@ MODULE ionise
 
   IMPLICIT NONE
 
+  INTEGER:: ionRate_na, ionRate_nb
+
   REAL(num), PARAMETER :: ionisation_exponent = -1.0 / 3.0_num
   REAL(num), PARAMETER :: bessel_constant = SQRT(8.0_num / pi)
 
@@ -45,7 +47,10 @@ MODULE ionise
   REAL(num), DIMENSION(:), ALLOCATABLE :: k_photons_energy
   REAL(num), DIMENSION(:), ALLOCATABLE :: k_photons_exponent
   REAL(num), DIMENSION(:), ALLOCATABLE :: adk_multiphoton_cap
-  REAL(num) :: omega
+  REAL(num), DIMENSION(:), ALLOCATABLE :: gmin
+  REAL(num), DIMENSION(:), ALLOCATABLE :: dg1
+  ! REAL(num), DIMENSION(:,:), ALLOCATABLE :: ionRate_table
+  REAL(num) :: omega,dg2
 
 CONTAINS
 
@@ -203,6 +208,15 @@ CONTAINS
     IF (use_multiphoton) ALLOCATE(keldysh(n_species), &
         multi_constant(n_species), k_photons_energy(n_species), &
         k_photons_exponent(n_species), adk_multiphoton_cap(n_species))
+    IF (use_ionRate) THEN
+      IF(gamma_D .GE. 0.0_num) THEN !Do not re-allocate ionRate_table
+      ELSE
+        ionRate_na = 98000 ! This is the number of array elements bel
+        ionRate_nb = ionRate_na + 2000
+        ALLOCATE(ionRate_table(n_species, ionRate_nb), &
+                 gmin(n_species), dg1(n_species))
+      ENDIF
+    ENDIF
 
     DO i = 1, n_species
       IF (species_list(i)%ionise) THEN
@@ -328,6 +342,17 @@ CONTAINS
           smallest_e_mag(i) = adk_scaling(i) / (0.99472065388909858_num &
               * c_largest_exp)
         ENDIF
+        IF (use_ionRate) THEN
+          ! smallest value of keldysh parameter is 0.01 (first table entry)
+          gmin(i) = 0.01_num
+          ! keldysh parameter incrementation is 0.0005 in the tunnel (dg1) and
+          ! in the mpi (dg2) regimes 
+          dg1(i) = 0.0005_num
+          dg2 = 0.0005_num
+          
+          CALL build_table(i)
+          IF (rank .EQ. 0) print*,"Tabling is over"
+        ENDIF
       ELSE
         released_mass_fraction(i) = 0.0_num
         effective_n_exponent(i) = 0.0_num
@@ -351,6 +376,75 @@ CONTAINS
     ENDDO
 
   END SUBROUTINE initialise_ionisation
+
+
+
+  SUBROUTINE build_table(indi)
+    ! checks if a table exists and loads it or it makes a new one
+    IMPLICIT NONE
+    INTEGER, INTENT(IN) :: indi
+    REAL(num) :: AngFreq, Ion_pot, Amplitude
+    INTEGER :: dexA, kappa, na
+    LOGICAL :: file_exists
+    CHARACTER(len=1024) :: table_name
+    WRITE(table_name,"(A18)") &
+    "ionisationRate.txt"
+    
+    INQUIRE(FILE=table_name, EXIST=file_exists)
+    IF (file_exists) THEN
+      IF (rank .EQ. 0) THEN
+        print *, "Loading ionRate Table"
+      ENDIF
+      ! This table has been made before! We can just read it!
+      OPEN(UNIT=2, FILE=table_name, STATUS='old', ACCESS='sequential', &
+      FORM='formatted', ACTION='read')
+
+      DO na=1, ionRate_nb
+        READ(2,24) ionRate_table(indi,na)
+        24 FORMAT(ES24.8)
+      ENDDO
+    ELSE
+      ! No table available
+      IF (rank .EQ. 0) THEN
+        print *, "No ionisation rate table available"
+      ENDIF
+    ENDIF
+    CLOSE(2)
+  END SUBROUTINE build_table
+
+
+
+  REAL(num) FUNCTION ionRate_rate(IonPot, E_mag, indexsu)
+    
+    REAL(num), INTENT(IN) :: IonPot, E_mag
+    INTEGER, INTENT(IN) :: indexsu
+    INTEGER :: picka
+    REAL(num) :: g
+    REAL(num) :: ionRate_rate_temp
+
+    g = SQRT(2.0_num*m0*IonPot)*omega/q0/E_mag
+
+    !for solid state keldysh theory, g differ from this factor:
+    g = g*SQRT(0.5)*SQRT(1.0/0.18)
+    
+    ! Interpolation from the ionRate table
+    IF (g .LT. 1.0_num) THEN
+      picka = (g - gmin(indexsu))/dg1(indexsu)
+      ionRate_rate_temp  = ionRate_table(indexsu,picka) + &
+      (ionRate_table(indexsu,picka+1) - &
+      ionRate_table(indexsu,picka))*(g-picka*dg1(indexsu) - &
+      gmin(indexsu))/dg1(indexsu)
+    ELSE
+      picka = ionRate_na  + (g-1.0_num)/dg2
+        ionRate_rate_temp  = ionRate_table(indexsu,picka) + &
+        (ionRate_table(indexsu,picka+1) - &
+        ionRate_table(indexsu,picka))*(g - 1.0_num - &
+        (picka-ionRate_na)*dg2)/dg2
+    ENDIF
+          
+    ionRate_rate = ionRate_rate_temp
+  END FUNCTION ionRate_rate
+
 
 
 
@@ -419,6 +513,295 @@ CONTAINS
     IF (smooth_currents) CALL smooth_current()
 
   END SUBROUTINE ionise_particles
+
+
+
+  SUBROUTINE ionise_ionRate
+
+    INTEGER :: i, current_state, bessel_error
+    INTEGER :: ix, cell_x1, cell_x2, dcellx
+    INTEGER :: iy, cell_y1, cell_y2, dcelly
+    INTEGER :: iz, cell_z1, cell_z2, dcellz
+    INTEGER :: kappa
+    REAL(num) :: rate, ex_part, ey_part, ez_part, e_part_mag, time_left, sample
+    REAL(num) :: dfac, weight, j_ion(3)
+    REAL(num) :: gx(sf_min:sf_max), hx(sf_min:sf_max)
+    REAL(num) :: gy(sf_min:sf_max), hy(sf_min:sf_max)
+    REAL(num) :: gz(sf_min:sf_max), hz(sf_min:sf_max)
+    REAL(num) :: part_x, cell_x_r, cell_frac_x, idx
+    REAL(num) :: part_y, cell_y_r, cell_frac_y, idy
+    REAL(num) :: part_z, cell_z_r, cell_frac_z, idz
+    REAL(num) :: g, nu
+    LOGICAL :: multiphoton_ionised
+
+    TYPE(particle), POINTER :: current, new, next
+    TYPE(particle_list) :: ionised_list(n_species)
+
+    ! Particle weighting multiplication factor
+#ifdef PARTICLE_SHAPE_BSPLINE3
+    REAL(num) :: cf2
+    REAL(num), PARAMETER :: fac = (1.0_num / 24.0_num)**c_ndims
+#elif  PARTICLE_SHAPE_TOPHAT
+    REAL(num), PARAMETER :: fac = 1.0_num
+#else
+    REAL(num) :: cf2
+    REAL(num), PARAMETER :: fac = (0.5_num)**c_ndims
+#endif
+
+    idx = 1.0_num / dx
+    idy = 1.0_num / dy
+    idz = 1.0_num / dz
+
+    dfac = fac**2 / dt / dx / dy / dz
+
+    ! Stores ionised species until close of ionisation run. Main purpose of this
+    ! method is to ensure proper statistics (i.e. prevent ionisation rate being
+    ! calculated for full dt when particle has already ionised in time step)
+    ! and to stop electric field at particle being calculated more than once
+    DO i = 1, n_species
+      CALL create_empty_partlist(ionised_list(i))
+    ENDDO
+
+    ! Ionise a species at a time
+    DO i = 1, n_species
+      ! Skip particle if it cannot be ionised
+      IF ( .NOT. species_list(i)%ionise) CYCLE
+      ! Start with first particle in the list
+      current => species_list(i)%attached_list%head
+#ifdef PER_SPECIES_WEIGHT
+      weight = species_list(i)%weight
+#endif
+
+      ! Try to ionise every particle of the species
+      DO WHILE(ASSOCIATED(current))
+        ! Copy the particle properties out for speed
+        part_x  = current%part_pos(1) - x_grid_min_local
+        part_y  = current%part_pos(2) - y_grid_min_local
+        part_z  = current%part_pos(3) - z_grid_min_local
+
+        ! Grid cell position as a fraction.
+#ifdef PARTICLE_SHAPE_TOPHAT
+        cell_x_r = part_x * idx - 0.5_num
+        cell_y_r = part_y * idy - 0.5_num
+        cell_z_r = part_z * idz - 0.5_num
+#else
+        cell_x_r = part_x * idx
+        cell_y_r = part_y * idy
+        cell_z_r = part_z * idz
+#endif
+        ! Round cell position to nearest cell
+        cell_x1 = FLOOR(cell_x_r + 0.5_num)
+        ! Calculate fraction of cell between nearest cell boundary and particle
+        cell_frac_x = REAL(cell_x1, num) - cell_x_r
+        cell_x1 = cell_x1 + 1
+
+        cell_y1 = FLOOR(cell_y_r + 0.5_num)
+        cell_frac_y = REAL(cell_y1, num) - cell_y_r
+        cell_y1 = cell_y1 + 1
+
+        cell_z1 = FLOOR(cell_z_r + 0.5_num)
+        cell_frac_z = REAL(cell_z1, num) - cell_z_r
+        cell_z1 = cell_z1 + 1
+
+        ! Particle weight factors as described in the manual, page25
+        ! These weight grid properties onto particles
+        ! Also used to weight particle properties onto grid, used later
+        ! to calculate J
+        ! NOTE: These weights require an additional multiplication factor!
+#ifdef PARTICLE_SHAPE_BSPLINE3
+#include "bspline3/gx.inc"
+#elif  PARTICLE_SHAPE_TOPHAT
+#include "tophat/gx.inc"
+#else
+#include "triangle/gx.inc"
+#endif
+
+        ! Now redo shifted by half a cell due to grid stagger.
+        ! Use shifted version for ex in X, ey in Y, ez in Z
+        ! And in Y&Z for bx, X&Z for by, X&Y for bz
+        cell_x2 = FLOOR(cell_x_r)
+        cell_frac_x = REAL(cell_x2, num) - cell_x_r + 0.5_num
+        cell_x2 = cell_x2 + 1
+
+        cell_y2 = FLOOR(cell_y_r)
+        cell_frac_y = REAL(cell_y2, num) - cell_y_r + 0.5_num
+        cell_y2 = cell_y2 + 1
+
+        cell_z2 = FLOOR(cell_z_r)
+        cell_frac_z = REAL(cell_z2, num) - cell_z_r + 0.5_num
+        cell_z2 = cell_z2 + 1
+
+        dcellx = 0
+        dcelly = 0
+        dcellz = 0
+        ! NOTE: These weights require an additional multiplication factor!
+#ifdef PARTICLE_SHAPE_BSPLINE3
+#include "bspline3/hx_dcell.inc"
+#elif  PARTICLE_SHAPE_TOPHAT
+#include "tophat/hx_dcell.inc"
+#else
+#include "triangle/hx_dcell.inc"
+#endif
+
+        ! These are the electric and magnetic fields interpolated to the
+        ! particle position. They have been checked and are correct.
+        ! Actually checking this is messy.
+        ! This can be done with electric field smoothing but hasn't been
+        ! necessary since the statistics were changed away from using number
+        ! densities.
+#ifdef PARTICLE_SHAPE_BSPLINE3
+#include "bspline3/e_part.inc"
+#elif  PARTICLE_SHAPE_TOPHAT
+#include "tophat/e_part.inc"
+#else
+#include "triangle/e_part.inc"
+#endif
+
+        ! Electric field strength in atomic units
+        e_part_mag = fac * SQRT(ex_part**2 + ey_part**2 + ez_part**2) &
+            / atomic_electric_field
+        next => current%next
+        ! Need to keep track of what ionisation state current particle has
+        ! moved to
+        current_state = i
+        time_left = dt / atomic_time
+        j_ion = 0.0_num
+
+        ! This cycles through every ionisation level for the particle until it
+        ! is no longer ionising in the field
+        DO WHILE(time_left > 0.0_num &
+            .AND. species_list(current_state)%ionise)
+          ! If the electron is ionised in the multiphoton regime, the resultant
+          ! velocity is different so we need to track this
+          multiphoton_ionised = .FALSE.
+          
+        ! Keldysh parameter
+          g = SQRT(2.0_num*m0*species_list(i)%ionisation_energy)*omega/q0 &
+              /e_part_mag
+          IF (49.0_num .LT. g) THEN ! if g is very large ionization won't go
+            EXIT
+          ENDIF
+          IF (g .LT. gmin(i)) THEN
+            print*,"Electric field has exceeded maximum for ionRate routine"
+            EXIT
+          ENDIF
+          nu = species_list(current_state)%ionisation_energy/h_bar/omega* &
+            (1.0_num + 0.5_num/g**2)
+          kappa = nu + 1
+      
+          rate = ionRate_rate(species_list(i)%ionisation_energy,e_part_mag,i)
+
+          ! determining if ionization is multi-photon
+          IF (g .GT. 0.5_num) THEN
+            multiphoton_ionised = .TRUE.
+          ENDIF
+
+          sample = random()
+          ! Calculate probability of ionisation using a cumulative distribution
+          ! function modelling ionisation in a field as an exponential decay
+          IF (sample < 1.0_num - exp(-1.0_num * rate * time_left)) THEN
+            IF (species_list(current_state)%release_species > 0) THEN
+              CALL create_particle(new)
+              ! Create electron for release
+#ifndef PER_SPECIES_WEIGHT
+              new%weight = current%weight
+#endif
+              new%part_pos = current%part_pos
+              ! Electron is released without acceleration so simply use momentum
+              ! conservation to split the particle
+              new%part_p = current%part_p &
+                  * released_mass_fraction(current_state)
+              current%part_p = current%part_p - new%part_p
+              ! Using multiphoton ionisation, the additional energy from photons
+              ! accelerates the electron in the direction of the electric field.
+              ! This is an approximation as the ejection angle ranges widely
+              ! with a maxima at theta = 0 with respect to the field
+              IF (multiphoton_ionised) new%part_p = new%part_p + SQRT(2.0_num &
+                  * m0 * (k_photons_energy(current_state) &
+                  - species_list(current_state)%ionisation_energy)) &
+                  * fac * (/ ex_part, ey_part, ez_part /) / (e_part_mag &
+                  * atomic_electric_field)
+#ifdef PER_PARTICLE_CHARGE_MASS
+              new%charge = species_list( &
+                  species_list(current_state)%release_species)%charge
+              new%mass = species_list( &
+                  species_list(current_state)%release_species)%mass
+              current%charge = current%charge - new%charge
+              current%mass = current%mass - new%mass
+#endif
+#ifdef PARTICLE_DEBUG
+              new%processor = rank
+              new%processor_at_t0 = rank
+#endif
+              ! Put electron into particle lists
+              CALL add_particle_to_partlist(species_list(species_list( &
+                  current_state)%release_species)%attached_list, new)
+            ENDIF
+            ! Calculates the time of ionisation using inverse sampling, and
+            ! subtracts it from the time step. Ensures diminishing time for
+            ! successive ionisations
+            time_left = time_left + log(1.0_num - sample) / rate
+            ! Current correction as proposed from Mulser et al 1998, true from
+            ! ejection energy <e_j> << m_e*c**2, i.e. sub-relativistic ejection
+            ! velocity. This shall be true for all laser gamma factors, as BSI
+            ! techniques release electron at rest in zero field approximation,
+            ! and BSI encompasses both tunneling and over-barrier ionisation
+            ! rates. Multiphoton rates will only be used for low intensity
+            ! lasers
+            IF (multiphoton_ionised) THEN
+              j_ion = j_ion + k_photons_energy(current_state)
+            ELSE
+              j_ion = j_ion + species_list(current_state)%ionisation_energy
+            ENDIF
+            current_state = species_list(current_state)%ionise_to_species
+          ELSE
+            time_left = 0.0_num
+          ENDIF
+        ENDDO
+
+        ! Finally the ion is moved to the ionised list following multiple
+        ! ionisation, and current correction is applied
+        IF (current_state /= i) THEN
+          CALL remove_particle_from_partlist(species_list(i)%attached_list, &
+              current)
+          CALL add_particle_to_partlist(ionised_list(current_state), current)
+
+#ifndef PER_SPECIES_WEIGHT
+          weight = current%weight
+#endif
+          j_ion = dfac * j_ion * weight * (/ ex_part, ey_part, ez_part /) &
+              / (atomic_electric_field * e_part_mag)**2
+
+          IF (ABS(j_ion(1)) > c_tiny &
+              .OR. ABS(j_ion(2)) > c_tiny .OR. ABS(j_ion(3)) > c_tiny) THEN
+            DO iz = sf_min, sf_max
+            DO iy = sf_min, sf_max
+            DO ix = sf_min, sf_max
+              jx(cell_x2+ix, cell_y1+iy, cell_z1+iz) = &
+                  jx(cell_x2+ix, cell_y1+iy, cell_z1+iz) &
+                  + hx(ix) * gy(iy) * gz(iz) * j_ion(1)
+              jy(cell_x1+ix, cell_y2+iy, cell_z1+iz) = &
+                  jy(cell_x1+ix, cell_y2+iy, cell_z1+iz) &
+                  + gx(ix) * hy(iy) * gz(iz) * j_ion(2)
+              jz(cell_x1+ix, cell_y1+iy, cell_z2+iz) = &
+                  jz(cell_x1+ix, cell_y1+iy, cell_z2+iz) &
+                  + gx(ix) * gy(iy) * hz(iz) * j_ion(3)
+            ENDDO
+            ENDDO
+            ENDDO
+          ENDIF
+        ENDIF
+        current => next
+      ENDDO
+    ENDDO
+
+    ! Clean up procedure; put ionised ions back into the correct particle lists
+    DO i = 1, n_species
+      CALL append_partlist(species_list(i)%attached_list, ionised_list(i))
+    ENDDO
+    ! Put ionised particles back into partlists
+
+  END SUBROUTINE ionise_ionRate
 
 
 

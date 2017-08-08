@@ -77,11 +77,6 @@ MODULE constants
   INTEGER, PARAMETER :: c_bd_z_min = 5
   INTEGER, PARAMETER :: c_bd_z_max = 6
 
-  ! Frequency function type codes
-  INTEGER, PARAMETER :: c_of_omega = 1
-  INTEGER, PARAMETER :: c_of_freq = 2
-  INTEGER, PARAMETER :: c_of_lambda = 3
-
   ! Error codes
   INTEGER, PARAMETER :: c_err_none = 0
   INTEGER, PARAMETER :: c_err_unknown_block = 2**0
@@ -192,11 +187,10 @@ MODULE constants
   INTEGER, PARAMETER :: c_dir_xy_angle = c_ndims + 6
   INTEGER, PARAMETER :: c_dir_yz_angle = c_ndims + 7
   INTEGER, PARAMETER :: c_dir_zx_angle = c_ndims + 8
-  INTEGER, PARAMETER :: c_dir_mod_p = c_ndims + 9
 
   ! constants defining the maximum number of dimensions and directions
   ! in a distribution function
-  INTEGER, PARAMETER :: c_df_maxdirs = c_dir_mod_p
+  INTEGER, PARAMETER :: c_df_maxdirs = c_dir_zx_angle
   INTEGER, PARAMETER :: c_df_maxdims = 3
 
   ! define flags
@@ -233,10 +227,26 @@ MODULE constants
   INTEGER, PARAMETER :: c_stagger_jx = c_stagger_ex
   INTEGER, PARAMETER :: c_stagger_jy = c_stagger_ey
   INTEGER, PARAMETER :: c_stagger_jz = c_stagger_ez
+#ifdef NONLINEAR_OPTICS
+  INTEGER, PARAMETER :: c_stagger_jx_nlo = c_stagger_jx
+  INTEGER, PARAMETER :: c_stagger_jy_nlo = c_stagger_jy
+  INTEGER, PARAMETER :: c_stagger_jz_nlo = c_stagger_jz
+  INTEGER, PARAMETER :: c_stagger_px_nlo = c_stagger_jx
+  INTEGER, PARAMETER :: c_stagger_py_nlo = c_stagger_jy
+  INTEGER, PARAMETER :: c_stagger_pz_nlo = c_stagger_jz
+  INTEGER, PARAMETER :: c_stagger_medium_mask = c_stagger_cell_centre
+  INTEGER, PARAMETER :: c_stagger_jx_D = c_stagger_jx
+  INTEGER, PARAMETER :: c_stagger_jy_D = c_stagger_jy
+  INTEGER, PARAMETER :: c_stagger_jz_D = c_stagger_jz
+  INTEGER, PARAMETER :: c_stagger_jx_mpi = c_stagger_jx
+  INTEGER, PARAMETER :: c_stagger_jy_mpi = c_stagger_jy
+  INTEGER, PARAMETER :: c_stagger_jz_mpi = c_stagger_jz
+  INTEGER, PARAMETER :: c_stagger_electron_density_Drude = c_stagger_cell_centre
+  INTEGER, PARAMETER :: c_stagger_electron_temperature = c_stagger_cell_centre
+#endif
 
   ! Length of a standard string
   INTEGER, PARAMETER :: string_length = 256
-
   INTEGER, PARAMETER :: stat_unit = 20
 
 END MODULE constants
@@ -295,11 +305,11 @@ MODULE shared_parser_data
   INTEGER, PARAMETER :: c_assoc_ra = 3
 
   INTEGER, DIMENSION(c_num_ops), PARAMETER :: &
-      opcode_precedence = (/2, 2, 3, 3, 4, 4, 1, 1, 1, 0, 0, 4, 4/)
+      opcode_precedence = (/1, 1, 2, 2, 3, 4, 1, 1, 1, 2, 2, 5, 5/)
   INTEGER, DIMENSION(c_num_ops), PARAMETER :: &
       opcode_assoc = (/c_assoc_a, c_assoc_la, c_assoc_a, c_assoc_la, &
-          c_assoc_ra, c_assoc_ra, c_assoc_la, c_assoc_la, c_assoc_la, &
-          c_assoc_la, c_assoc_la, c_assoc_ra, c_assoc_ra/)
+          c_assoc_la, c_assoc_a, c_assoc_a, c_assoc_a, c_assoc_a, c_assoc_a, &
+          c_assoc_a, c_assoc_ra, c_assoc_ra/)
 
   INTEGER, PARAMETER :: c_paren_left_bracket = 1
   INTEGER, PARAMETER :: c_paren_right_bracket = 2
@@ -323,9 +333,6 @@ MODULE shared_parser_data
   INTEGER, PARAMETER :: c_const_atto = 16
 
   ! Constants refering to grid properties
-  INTEGER, PARAMETER :: c_const_xb = 22
-  INTEGER, PARAMETER :: c_const_yb = 23
-  INTEGER, PARAMETER :: c_const_zb = 24
   INTEGER, PARAMETER :: c_const_x = 25
   INTEGER, PARAMETER :: c_const_y = 26
   INTEGER, PARAMETER :: c_const_z = 27
@@ -381,7 +388,6 @@ MODULE shared_parser_data
   INTEGER, PARAMETER :: c_const_dir_xy_angle = 88
   INTEGER, PARAMETER :: c_const_dir_yz_angle = 89
   INTEGER, PARAMETER :: c_const_dir_zx_angle = 90
-  INTEGER, PARAMETER :: c_const_dir_mod_p = 91
 
   ! Custom constants
   INTEGER, PARAMETER :: c_const_deck_lowbound = 4096
@@ -705,7 +711,26 @@ MODULE shared_data
   INTEGER, PARAMETER :: c_dump_part_gamma        = 53
   INTEGER, PARAMETER :: c_dump_part_proc         = 54
   INTEGER, PARAMETER :: c_dump_part_proc0        = 55
+#ifdef NONLINEAR_OPTICS
+  INTEGER, PARAMETER :: c_dump_jx_nlo            = 56
+  INTEGER, PARAMETER :: c_dump_jy_nlo            = 57
+  INTEGER, PARAMETER :: c_dump_jz_nlo            = 58
+  INTEGER, PARAMETER :: c_dump_px_nlo            = 59
+  INTEGER, PARAMETER :: c_dump_py_nlo            = 60
+  INTEGER, PARAMETER :: c_dump_pz_nlo            = 61
+  INTEGER, PARAMETER :: c_dump_medium_mask       = 62
+  INTEGER, PARAMETER :: c_dump_jx_D              = 63
+  INTEGER, PARAMETER :: c_dump_jy_D              = 64
+  INTEGER, PARAMETER :: c_dump_jz_D              = 65
+  INTEGER, PARAMETER :: c_dump_jx_mpi            = 66
+  INTEGER, PARAMETER :: c_dump_jy_mpi            = 67
+  INTEGER, PARAMETER :: c_dump_jz_mpi            = 68
+  INTEGER, PARAMETER :: c_dump_electron_density_Drude = 69
+  INTEGER, PARAMETER :: c_dump_electron_temperature = 70
+  INTEGER, PARAMETER :: num_vars_to_dump         = 70
+#else
   INTEGER, PARAMETER :: num_vars_to_dump         = 55
+#endif
   INTEGER, DIMENSION(num_vars_to_dump) :: dumpmask
 
   !----------------------------------------------------------------------------
@@ -901,13 +926,11 @@ MODULE shared_data
   REAL(num), ALLOCATABLE, DIMENSION(:,:) :: by_z_min, by_z_max
   REAL(num), ALLOCATABLE, DIMENSION(:,:) :: bz_z_min, bz_z_max
 
-  REAL(num) :: initial_jx, initial_jy, initial_jz
-
   TYPE(particle_species), DIMENSION(:), POINTER :: species_list
   TYPE(particle_species), DIMENSION(:), POINTER :: ejected_list
   TYPE(particle_species), DIMENSION(:), POINTER :: io_list, io_list_data
 
-  REAL(num), ALLOCATABLE, DIMENSION(:) :: x, xb, y, yb, z, zb
+  REAL(num), ALLOCATABLE, DIMENSION(:) :: x, y, z
 
   INTEGER, PARAMETER :: data_dir_max_length = 64
   CHARACTER(LEN=data_dir_max_length) :: data_dir, filesystem
@@ -947,7 +970,6 @@ MODULE shared_data
   LOGICAL :: print_deck_constants
   LOGICAL :: allow_missing_restart
   LOGICAL :: done_mpi_initialise = .FALSE.
-  LOGICAL :: use_current_correction
   INTEGER, DIMENSION(2*c_ndims) :: bc_field, bc_particle
   INTEGER :: restart_number, step
   CHARACTER(LEN=5+c_max_zeros+c_id_length) :: restart_filename
@@ -966,7 +988,10 @@ MODULE shared_data
   LOGICAL :: coulomb_log_auto, use_collisions
 
   LOGICAL :: use_field_ionisation, use_collisional_ionisation
-  LOGICAL :: use_multiphoton, use_bsi
+  LOGICAL :: use_multiphoton, use_ionRate, use_bsi
+  LOGICAL :: use_mre_avalanche
+  CHARACTER(LEN=string_length) :: path_ionRate_table 
+  REAL(num), DIMENSION(:,:), ALLOCATABLE :: ionRate_table
 
   !----------------------------------------------------------------------------
   ! Moving window
@@ -1002,6 +1027,56 @@ MODULE shared_data
   CHARACTER(LEN=string_length) :: qed_table_location
 #endif
   LOGICAL :: use_qed = .FALSE.
+
+#ifdef NONLINEAR_OPTICS
+  !----------------------------------------------------------------------------
+  ! Nonlinear optics - Written by C. Varin and R. Emms
+  !----------------------------------------------------------------------------
+  REAL(num) :: resonance, gamma
+  REAL(num) :: chi1, chi2, chi3
+  REAL(num) :: nlo_x_min, nlo_x_max
+  REAL(num) :: nlo_y_min, nlo_y_max
+  REAL(num) :: nlo_z_min, nlo_z_max
+
+  REAL(num), ALLOCATABLE, DIMENSION(:,:,:) :: jx_nlo, jy_nlo, jz_nlo
+  REAL(num), ALLOCATABLE, DIMENSION(:,:,:) :: px_nlo, py_nlo, pz_nlo
+  REAL(num), ALLOCATABLE, DIMENSION(:,:,:) :: eps0chi, intensity, medium_mask
+
+  ! If medium_mask is loaded from a file, this is the path
+  CHARACTER(LEN=string_length) :: path_medium_mask 
+  ! Path for rho_incubation file
+  CHARACTER(LEN=string_length) :: path_rho_incubation
+  REAL(num), DIMENSION(:,:,:), ALLOCATABLE :: rho_incubation
+
+  !----------------------------------------------------------------------------
+  ! Drude Model - Written by C. Varin and J.-L. Deziel
+  !----------------------------------------------------------------------------
+  ! If gamma_D is not used in the input deck, no Drude model. omega_p is 
+  ! dynamic by default (depends on the local electron density). If 
+  ! omega_p_static is defined, omega_p becomes constant over all the medium
+  ! and takes the static value.
+
+  REAL(num) :: gamma_D, omega_p_static, bandGap_drude
+  REAL(num) :: effective_mass_electron, effective_mass_hole,reduced_mass
+  REAL(num) :: atom_density,avalanche_factor
+  REAL(num) :: recombination_rate,omega_laser,amp_laser
+
+  ! This is the number of comp. cells in which surface roughness is confined
+  REAL(num) :: rug_thickness
+
+  REAL(num), ALLOCATABLE, DIMENSION(:,:,:) :: dynamic_gamma_drude
+  REAL(num), ALLOCATABLE, DIMENSION(:,:,:) :: jx_D, jy_D, jz_D
+  REAL(num), ALLOCATABLE, DIMENSION(:,:,:) :: jx_mpi, jy_mpi, jz_mpi
+  REAL(num), ALLOCATABLE, DIMENSION(:,:,:) :: omega_p, electron_density_Drude
+
+  INTEGER :: mre_nb_levels
+  REAL(num) :: drude_cross_section,mre_critical_energy
+  REAL(num) :: mre_avalanche_factor, room_temperature
+  REAL(num), DIMENSION(:,:,:,:), ALLOCATABLE :: mre_rho
+  REAL(num), ALLOCATABLE, DIMENSION(:,:,:) :: electron_temperature
+
+  LOGICAL :: use_Drude, Drude_static, use_dynamic_gamma_drude
+#endif
 
   !----------------------------------------------------------------------------
   ! MPI data
@@ -1054,15 +1129,11 @@ MODULE shared_data
     INTEGER :: id
     REAL(num), DIMENSION(:,:), POINTER :: profile
     REAL(num), DIMENSION(:,:), POINTER :: phase
-    REAL(num) :: current_integral_phase
 
     LOGICAL :: use_time_function, use_phase_function, use_profile_function
-    LOGICAL :: use_omega_function
     TYPE(primitive_stack) :: time_function, phase_function, profile_function
-    TYPE(primitive_stack) :: omega_function
 
     REAL(num) :: amp, omega, pol_angle, t_start, t_end
-    INTEGER :: omega_func_type
 
     TYPE(laser_block), POINTER :: next
   END TYPE laser_block
@@ -1070,9 +1141,9 @@ MODULE shared_data
   TYPE(laser_block), POINTER :: laser_x_min, laser_x_max
   TYPE(laser_block), POINTER :: laser_y_min, laser_y_max
   TYPE(laser_block), POINTER :: laser_z_min, laser_z_max
-  INTEGER :: n_laser_x_min = 0, n_laser_x_max = 0
-  INTEGER :: n_laser_y_min = 0, n_laser_y_max = 0
-  INTEGER :: n_laser_z_min = 0, n_laser_z_max = 0
+  INTEGER :: n_laser_x_min, n_laser_x_max
+  INTEGER :: n_laser_y_min, n_laser_y_max
+  INTEGER :: n_laser_z_min, n_laser_z_max
   LOGICAL, DIMENSION(2*c_ndims) :: add_laser = .FALSE.
 
   TYPE(jobid_type) :: jobid

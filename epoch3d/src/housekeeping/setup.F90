@@ -129,17 +129,10 @@ CONTAINS
     stagger(c_dir_y,c_stagger_by) = .FALSE.
     stagger(c_dir_z,c_stagger_bz) = .FALSE.
 
-    CALL set_tokenizer_stagger(c_stagger_centre)
-
     ALLOCATE(x(1), y(1), z(1))
     x = 0.0_num
     y = 0.0_num
     z = 0.0_num
-
-    ALLOCATE(xb(1), yb(1), zb(1))
-    xb = 0.0_num
-    yb = 0.0_num
-    zb = 0.0_num
 
     CALL eval_stack_init
 
@@ -192,16 +185,22 @@ CONTAINS
     ! Setup global grid
     DO ix = -2, nx_global + 3
       x_global(ix) = x_grid_min + (ix - 1) * dx
+    ENDDO
+    DO ix = 1, nx_global + 1
       xb_global(ix) = xb_min + (ix - 1) * dx
       xb_offset_global(ix) = xb_global(ix)
     ENDDO
     DO iy = -2, ny_global + 3
       y_global(iy) = y_grid_min + (iy - 1) * dy
+    ENDDO
+    DO iy = 1, ny_global + 1
       yb_global(iy) = yb_min + (iy - 1) * dy
       yb_offset_global(iy) = yb_global(iy)
     ENDDO
     DO iz = -2, nz_global + 3
       z_global(iz) = z_grid_min + (iz - 1) * dz
+    ENDDO
+    DO iz = 1, nz_global + 1
       zb_global(iz) = zb_min + (iz - 1) * dz
       zb_offset_global(iz) = zb_global(iz)
     ENDDO
@@ -234,13 +233,15 @@ CONTAINS
     z_max_local = z_grid_max_local - (cpml_z_max_offset - 0.5_num) * dz
 
     ! Setup local grid
-    x(-2:nx+3) = x_global(nx_global_min-3:nx_global_max+3)
-    y(-2:ny+3) = y_global(ny_global_min-3:ny_global_max+3)
-    z(-2:nz+3) = z_global(nz_global_min-3:nz_global_max+3)
-
-    xb(-2:nx+3) = xb_global(nx_global_min-3:nx_global_max+3)
-    yb(-2:ny+3) = yb_global(ny_global_min-3:ny_global_max+3)
-    zb(-2:nz+3) = zb_global(nz_global_min-3:nz_global_max+3)
+    DO ix = -2, nx + 3
+      x(ix) = x_global(nx_global_min+ix-1)
+    ENDDO
+    DO iy = -2, ny + 3
+      y(iy) = y_global(ny_global_min+iy-1)
+    ENDDO
+    DO iz = -2, nz + 3
+      z(iz) = z_global(nz_global_min+iz-1)
+    ENDDO
 
   END SUBROUTINE setup_grid
 
@@ -581,7 +582,12 @@ CONTAINS
 
   SUBROUTINE set_initial_values
 
-    INTEGER :: seed
+    INTEGER :: seed=7842432
+    INTEGER :: mm_i,mm_j,mm_k
+    LOGICAL :: file_exists_mm,file_exists_ri,file_exists_ionRate
+    INTEGER :: na,nr,ns
+    REAL :: r_nb
+    REAL :: reflectance,ponderomotive_energy
 
     ex = 0.0_num
     ey = 0.0_num
@@ -596,11 +602,188 @@ CONTAINS
     jz = 0.0_num
 
     ! Set up random number seed
-    seed = 7842432
     IF (use_random_seed) CALL SYSTEM_CLOCK(seed)
-    seed = seed + rank
+      seed = seed + rank
+      CALL random_init(seed)
+      PRINT*, "Random seed has been set to", seed
 
-    CALL random_init(seed)
+#ifdef NONLINEAR_OPTICS
+    jx_nlo = 0.0_num
+    jy_nlo = 0.0_num
+    jz_nlo = 0.0_num
+
+    px_nlo = 0.0_num
+    py_nlo = 0.0_num
+    pz_nlo = 0.0_num
+
+    ! Here, the medium set with nlo_x_min, nlo_x_max, ...
+    ! Ultimately, medium_mask could be provided by the data from an input file.
+    medium_mask = 0.0_num
+    medium_mask(INT(nlo_x_min/dx):INT(nlo_x_max/dx),:,:) = 1.0_num
+    ! WARNING : The definition above assumes that x_min = 0 in deck file.
+
+    ! Generate surface roughness
+    nr = INT(nlo_x_min/dx)
+    do mm_i = 0,ny
+        do mm_j = 0,nz
+          r_nb = random()
+          ns = INT(r_nb*rug_thickness/dx)
+          medium_mask(nr-ns:nr,mm_i,mm_j) = 1.0_num
+        end do
+    end do
+
+    !-------------------------------------------------------------------------- 
+    ! Load medium_mask from file
+    !--------------------------------------------------------------------------
+
+    INQUIRE(FILE=TRIM(path_medium_mask)//"/mm.txt", EXIST=file_exists_mm)
+
+    IF (file_exists_mm) THEN
+      OPEN(UNIT=3, FILE=TRIM(path_medium_mask)//"/mm.txt", &
+        STATUS='old', ACCESS='sequential', FORM='formatted', ACTION='read')
+
+      DO mm_i = 1, nx
+        DO mm_j = 1, ny
+          DO mm_k = 1, nz
+            READ (3,*) medium_mask(mm_i, mm_j, mm_k) 
+          END DO
+        END DO 
+      END DO
+
+      print*, "Medium_mask loaded from file "//TRIM(path_medium_mask)//"/mm.txt"
+    ELSE
+      print *, "Medium_mask initialized"
+    ENDIF
+    CLOSE(3)
+
+    !-------------------------------------------------------------------------- 
+    ! Incubation (multipulses simulations)
+    !--------------------------------------------------------------------------
+
+    INQUIRE(FILE=TRIM(path_rho_incubation)//"/ri.txt", EXIST=file_exists_ri)
+
+    IF (file_exists_ri) THEN
+      OPEN(UNIT=4, FILE=TRIM(path_rho_incubation)//"/ri.txt", &
+        STATUS='old', ACCESS='sequential', FORM='formatted', ACTION='read')
+
+      DO mm_i = 1, nx
+        DO mm_j = 1, ny
+          DO mm_k = 1, nz
+            READ (4,*) rho_incubation(mm_i, mm_j, mm_k) 
+          END DO
+        END DO 
+      END DO
+
+      print*, "rho_incubation loaded from file "//TRIM(path_rho_incubation)//"/ri.txt"
+    ENDIF
+    CLOSE(4)
+
+    !-------------------------------------------------------------------------- 
+    ! Initialize Drude Model
+    !--------------------------------------------------------------------------
+    ! If gamma_D is not used in the input deck, no Drude model. omega_p is 
+    ! dynamic by default (depends on the local electron density). If 
+    ! omega_p_static is defined, omega_p becomes constant over all the medium
+    ! and takes the static value. Dynamical Drude needs ionRate.
+
+    IF (gamma_D .GE. 0.0_num) THEN
+
+      use_Drude = .TRUE.
+      ALLOCATE(dynamic_gamma_drude(nx,ny,nz))
+      DO mm_i = 1, nx
+        DO mm_j = 1, ny
+          DO mm_k = 1, nz
+            dynamic_gamma_drude(mm_i,mm_j,mm_k) = gamma_D
+          END DO
+        END DO 
+      END DO
+      reduced_mass = 1.0/(1.0/effective_mass_electron + 1.0/effective_mass_hole)
+
+      print*, "Drude model initialized"
+
+      IF (omega_p_static .GE. 0.0_num) THEN
+        Drude_static = .TRUE.
+        print*, "Drude model will use a constant omega_p value"
+      ELSE
+        IF (use_ionRate) THEN
+          print*, "Loading ionisation rate from "&
+            //TRIM(path_ionRate_table)//"/ionisationRate.txt"
+          ALLOCATE(ionRate_table(5,100000))
+
+          INQUIRE(FILE=TRIM(path_ionRate_table)//"/ionisationRate.txt", &
+            EXIST=file_exists_ionRate)
+
+          IF (file_exists_ionRate) THEN
+            OPEN(UNIT=2, FILE=TRIM(path_ionRate_table)//"/ionisationRate.txt", &
+              STATUS='old', ACCESS='sequential', &
+            FORM='formatted', ACTION='read')
+
+            DO na=1, 100000
+              READ(2,24) ionRate_table(1,na)
+              24 FORMAT(ES24.8)
+            ENDDO
+
+           ELSE
+            ! No table available
+            IF (rank .EQ. 0) THEN
+              print *, "No ionisation rate table available"
+            ENDIF
+          ENDIF
+          CLOSE(2)
+        ELSE
+          print*, "Missing ionisation rate table to use dynamic Drude"
+        ENDIF
+      ENDIF
+    ENDIF
+
+    !-------------------------------------------------------------------------- 
+    ! Initialize MRE avalanche model
+    !--------------------------------------------------------------------------
+    
+    IF (use_mre_avalanche) THEN
+      reduced_mass = 1.0/(1.0/effective_mass_electron + 1.0/effective_mass_hole)
+
+      reflectance = (((1.0_num+chi1)**0.5_num -1.0_num) &
+        /((1.0_num+chi1)**0.5_num +1.0_num))**2.0_num
+      amp_laser = amp_laser/((1.0_num+chi1)**0.25)*(1.0_num - reflectance)
+
+      ponderomotive_energy = (q0*amp_laser)**2.0/(4.0*reduced_mass*m0*omega_laser**2.0)
+      mre_critical_energy = (1.0_num + reduced_mass)*(bandGap_drude+ponderomotive_energy)
+
+      mre_nb_levels = CEILING(mre_critical_energy/(h_bar*omega_laser))
+
+      ALLOCATE(mre_rho(0:mre_nb_levels,nx,ny,nz))
+      room_temperature = 300.0_num
+
+      ! Incubation : The first level has an initial density
+      ! that depends on final density from the previous pulse.
+      IF (file_exists_ri) THEN
+        DO mm_i = 1, nx
+          DO mm_j = 1, ny
+            DO mm_k = 1, nz
+              mre_rho(0,mm_i,mm_j,mm_k) = rho_incubation(mm_i,mm_j,mm_k)
+              electron_temperature(mm_i,mm_j,mm_k) = room_temperature
+            END DO
+          END DO 
+        END DO
+      ENDIF
+
+      print*, "Initialized MRE avalanche model with ", mre_nb_levels+1, " energy levels."
+    ELSE
+      ! Incubation, if mre is not active. Simply populate the total CB pop. instead.
+      IF (file_exists_ri) THEN
+        DO mm_i = 1, nx
+          DO mm_j = 1, ny
+            DO mm_k = 1, nz
+              electron_density_drude(mm_i,mm_j,mm_k) = rho_incubation(mm_i,mm_j,mm_k)
+              electron_temperature(mm_i,mm_j,mm_k) = room_temperature
+            END DO
+          END DO 
+        END DO
+      ENDIF
+    ENDIF
+
+#endif
 
   END SUBROUTINE set_initial_values
 
@@ -609,7 +792,7 @@ CONTAINS
   SUBROUTINE set_plasma_frequency_dt
 
     INTEGER :: ispecies, ix, iy, iz
-    REAL(num) :: min_dt, omega2, omega, k_max, fac1, fac2, clipped_dens
+    REAL(num) :: min_dt, omega2, omega, k_max, fac1, fac2
 
     IF (ic_from_restart) RETURN
 
@@ -622,33 +805,17 @@ CONTAINS
       IF (species_list(ispecies)%species_type /= c_species_id_photon) THEN
         fac1 = q0**2 / species_list(ispecies)%mass / epsilon0
         fac2 = 3.0_num * k_max**2 * kb / species_list(ispecies)%mass
-        IF (initial_conditions(ispecies)%density_max > 0) THEN
-          DO iz = 1, nz
-          DO iy = 1, ny
-          DO ix = 1, nx
-            clipped_dens = MIN(initial_conditions(ispecies)%density(ix,iy,iz), &
-                initial_conditions(ispecies)%density_max)
-            omega2 = fac1 * clipped_dens &
-                + fac2 * MAXVAL(initial_conditions(ispecies)%temp(ix,iy,iz,:))
-            IF (omega2 <= c_tiny) CYCLE
-            omega = SQRT(omega2)
-            IF (2.0_num * pi / omega < min_dt) min_dt = 2.0_num * pi / omega
-          ENDDO ! ix
-          ENDDO ! iy
-          ENDDO ! iz
-        ELSE
-          DO iz = 1, nz
-          DO iy = 1, ny
-          DO ix = 1, nx
-            omega2 = fac1 * initial_conditions(ispecies)%density(ix,iy,iz) &
-                + fac2 * MAXVAL(initial_conditions(ispecies)%temp(ix,iy,iz,:))
-            IF (omega2 <= c_tiny) CYCLE
-            omega = SQRT(omega2)
-            IF (2.0_num * pi / omega < min_dt) min_dt = 2.0_num * pi / omega
-          ENDDO ! ix
-          ENDDO ! iy
-          ENDDO ! iz
-        ENDIF
+        DO iz = 1, nz
+        DO iy = 1, ny
+        DO ix = 1, nx
+          omega2 = fac1 * initial_conditions(ispecies)%density(ix,iy,iz) &
+              + fac2 * MAXVAL(initial_conditions(ispecies)%temp(ix,iy,iz,:))
+          IF (omega2 <= c_tiny) CYCLE
+          omega = SQRT(omega2)
+          IF (2.0_num * pi / omega < min_dt) min_dt = 2.0_num * pi / omega
+        ENDDO ! ix
+        ENDDO ! iy
+        ENDDO ! iz
       ENDIF
     ENDDO
 
@@ -1037,20 +1204,6 @@ CONTAINS
             CALL sdf_read_srl(sdf_handle, file_numbers)
           ENDIF
         ENDIF
-
-        CALL read_laser_phases(sdf_handle, n_laser_x_min, laser_x_min, &
-            block_id, ndims, 'laser_x_min_phase', 'x_min')
-        CALL read_laser_phases(sdf_handle, n_laser_x_max, laser_x_max, &
-            block_id, ndims, 'laser_x_max_phase', 'x_max')
-        CALL read_laser_phases(sdf_handle, n_laser_y_min, laser_y_min, &
-            block_id, ndims, 'laser_y_min_phase', 'y_min')
-        CALL read_laser_phases(sdf_handle, n_laser_y_max, laser_y_max, &
-            block_id, ndims, 'laser_y_max_phase', 'y_max')
-        CALL read_laser_phases(sdf_handle, n_laser_z_min, laser_z_min, &
-            block_id, ndims, 'laser_z_min_phase', 'z_min')
-        CALL read_laser_phases(sdf_handle, n_laser_z_max, laser_z_max, &
-            block_id, ndims, 'laser_z_max_phase', 'z_max')
-
       CASE(c_blocktype_constant)
         IF (str_cmp(block_id, 'dt_plasma_frequency')) THEN
           CALL sdf_read_srl(sdf_handle, dt_plasma_frequency)
@@ -1169,6 +1322,36 @@ CONTAINS
         ELSE IF (str_cmp(block_id, 'jz')) THEN
           CALL sdf_read_plain_variable(sdf_handle, jz, &
               subtype_field, subarray_field_big)
+
+#ifdef NONLINEAR_OPTICS
+        ELSE IF (str_cmp(block_id, 'jx_nlo')) THEN
+          CALL sdf_read_plain_variable(sdf_handle, jx_nlo, &
+              subtype_field, subarray_field)
+
+        ELSE IF (str_cmp(block_id, 'jy_nlo')) THEN
+          CALL sdf_read_plain_variable(sdf_handle, jy_nlo, &
+              subtype_field, subarray_field)
+
+        ELSE IF (str_cmp(block_id, 'jz_nlo')) THEN
+          CALL sdf_read_plain_variable(sdf_handle, jz_nlo, &
+              subtype_field, subarray_field)
+
+        ELSE IF (str_cmp(block_id, 'px_nlo')) THEN
+          CALL sdf_read_plain_variable(sdf_handle, px_nlo, &
+              subtype_field, subarray_field)
+
+        ELSE IF (str_cmp(block_id, 'py_nlo')) THEN
+          CALL sdf_read_plain_variable(sdf_handle, py_nlo, &
+              subtype_field, subarray_field)
+
+        ELSE IF (str_cmp(block_id, 'pz_nlo')) THEN
+          CALL sdf_read_plain_variable(sdf_handle, pz_nlo, &
+              subtype_field, subarray_field)
+
+        ELSE IF (str_cmp(block_id, 'medium_mask')) THEN
+          CALL sdf_read_plain_variable(sdf_handle, medium_mask, &
+              subtype_field, subarray_field)
+#endif
 
         ELSE IF (str_cmp(block_id, 'cpml_psi_eyx')) THEN
           CALL sdf_read_plain_variable(sdf_handle, cpml_psi_eyx, &
@@ -1343,40 +1526,6 @@ CONTAINS
     IF (rank == 0) PRINT*, 'Load from restart dump OK'
 
   END SUBROUTINE restart_data
-
-
-
-  SUBROUTINE read_laser_phases(sdf_handle, laser_count, laser_base_pointer, &
-      block_id_in, ndims, block_id_compare, direction_name)
-
-    TYPE(sdf_file_handle), INTENT(IN) :: sdf_handle
-    INTEGER, INTENT(IN) :: laser_count
-    TYPE(laser_block), POINTER :: laser_base_pointer
-    CHARACTER(LEN=*), INTENT(IN) :: block_id_in
-    INTEGER, INTENT(IN) :: ndims
-    CHARACTER(LEN=*), INTENT(IN) :: block_id_compare
-    CHARACTER(LEN=*), INTENT(IN) :: direction_name
-    REAL(num), DIMENSION(:), ALLOCATABLE :: laser_phases
-    INTEGER, DIMENSION(4) :: dims
-
-    IF (str_cmp(block_id_in, block_id_compare)) THEN
-      CALL sdf_read_array_info(sdf_handle, dims)
-
-      IF (ndims /= 1 .OR. dims(1) /= laser_count) THEN
-        PRINT*, '*** WARNING ***'
-        PRINT*, 'Number of laser phases on ', TRIM(direction_name), &
-            ' does not match number of lasers.'
-        PRINT*, 'Lasers will be populated in order, but correct operation ', &
-            'is not guaranteed'
-      ENDIF
-
-      ALLOCATE(laser_phases(dims(1)))
-      CALL sdf_read_srl(sdf_handle, laser_phases)
-      CALL setup_laser_phases(laser_base_pointer, laser_phases)
-      DEALLOCATE(laser_phases)
-    ENDIF
-
-  END SUBROUTINE read_laser_phases
 
 
 

@@ -48,7 +48,6 @@ PROGRAM pic
   USE collisions
   USE particle_migration
   USE ionise
-  USE calc_df
 #ifdef PHOTONS
   USE photons
 #endif
@@ -61,7 +60,7 @@ PROGRAM pic
   CHARACTER(LEN=64) :: deck_file = 'input.deck'
   CHARACTER(LEN=*), PARAMETER :: data_dir_file = 'USE_DATA_DIRECTORY'
   CHARACTER(LEN=64) :: timestring
-  REAL(num) :: runtime, dt0, dt_store
+  REAL(num) :: runtime, dt0
 
   step = 0
   time = 0.0_num
@@ -133,25 +132,18 @@ PROGRAM pic
   ! .TRUE. to over_ride balance fraction check
   IF (npart_global > 0) CALL balance_workload(.TRUE.)
 
-  IF (use_current_correction) CALL calc_initial_current
   CALL particle_bcs
   CALL efield_bcs
 
   IF (ic_from_restart) THEN
     dt0 = dt
-    dt_store = dt
     IF (dt_from_restart .GT. 0) dt0 = dt_from_restart
-    dt = dt0 / 2.0_num
-    time = time + dt
+    time = time + dt0 / 2.0_num
     CALL update_eb_fields_final
-    dt = dt_store
     CALL moving_window
   ELSE
-    dt_store = dt
-    dt = dt / 2.0_num
-    time = time + dt
+    time = time + dt / 2.0_num
     CALL bfield_final_bcs
-    dt = dt_store
   ENDIF
 
   ! Setup particle migration between species
@@ -209,7 +201,19 @@ PROGRAM pic
       IF (use_particle_migration) CALL migrate_particles(step)
       IF (use_field_ionisation) CALL ionise_particles
     ENDIF
+#ifdef NONLINEAR_OPTICS
+    CALL update_medium_polarisation
 
+    if (step == 0) then
+      open(13, file="p_vs_t.txt", action="write")
+    else 
+      open(13, file="p_vs_t.txt", position="append", action="write")
+    endif
+
+    Write(13,*) time, py_nlo(INT(nlo_x_min/dx) + 1, 2, 2), &
+                      py_nlo(INT(nlo_x_min/dx) + 100, 2, 2)
+    close(13)
+#endif
     CALL check_for_stop_condition(halt, force_dump)
     IF (halt) EXIT
     step = step + 1

@@ -114,8 +114,7 @@ CONTAINS
       RETURN
     ENDIF
 
-    IF (str_cmp(element, 'collisional_ionisation') &
-        .OR. str_cmp(element, 'collisional_ionization')) THEN
+    IF (str_cmp(element, 'collisional_ionisation')) THEN
       use_collisional_ionisation = as_logical_print(value, element, errcode)
       IF (use_collisional_ionisation) THEN
 #ifndef PER_SPECIES_WEIGHT
@@ -239,9 +238,9 @@ CONTAINS
     ENDIF
 
     coll_pairs(sp1, sp2) = collstate
-!    coll_pairs(sp2, sp1) = collstate
+    coll_pairs(sp2, sp1) = collstate
     coll_pairs_touched(sp1, sp2) = .TRUE.
-!    coll_pairs_touched(sp2, sp1) = .TRUE.
+    coll_pairs_touched(sp2, sp1) = .TRUE.
 
   END SUBROUTINE set_collision_matrix
 

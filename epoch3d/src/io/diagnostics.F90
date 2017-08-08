@@ -103,7 +103,7 @@ CONTAINS
     LOGICAL, SAVE :: first_call = .TRUE.
     TYPE(particle_species), POINTER :: species
     TYPE(subset), POINTER :: sub
-    CHARACTER(LEN=15) :: timestring, eta_timestring
+    CHARACTER(LEN=16) :: timestring, eta_timestring
     CHARACTER(LEN=1), DIMENSION(3) :: dim_tags = (/'x', 'y', 'z'/)
     CHARACTER(LEN=5), DIMENSION(6) :: dir_tags = &
         (/'x_max', 'y_max', 'z_max', 'x_min', 'y_min', 'z_min'/)
@@ -128,8 +128,8 @@ CONTAINS
             elapsed_time = (t_end - time) * elapsed_time / time
             CALL create_timestring(elapsed_time, eta_timestring)
           ENDIF
-          WRITE(*, '(''Time'', g14.6, '', iteration'', i9, '' after'', &
-              & a, '', ETA'',a)') time, step, timestring, eta_timestring
+          WRITE(*, '(''Time'', g14.6, '' and iteration'', i9, '' after'', &
+              & a, ''ETA'',a)') time, step, timestring, eta_timestring
         ELSE
           WRITE(*, '(''Time'', g20.12, '' and iteration'', i12, '' after'', &
               & a)') time, step, timestring
@@ -253,19 +253,6 @@ CONTAINS
               'Window Shift Fraction', window_shift_fraction)
         ENDIF
 
-        CALL write_laser_phases(sdf_handle, n_laser_x_min, laser_x_min, &
-            'laser_x_min_phase')
-        CALL write_laser_phases(sdf_handle, n_laser_x_max, laser_x_max, &
-            'laser_x_max_phase')
-        CALL write_laser_phases(sdf_handle, n_laser_y_min, laser_y_min, &
-            'laser_y_min_phase')
-        CALL write_laser_phases(sdf_handle, n_laser_y_max, laser_y_max, &
-            'laser_y_max_phase')
-        CALL write_laser_phases(sdf_handle, n_laser_z_min, laser_z_min, &
-            'laser_z_min_phase')
-        CALL write_laser_phases(sdf_handle, n_laser_z_max, laser_z_max, &
-            'laser_z_max_phase')
-
         DO io = 1, n_io_blocks
           CALL sdf_write_srl(sdf_handle, &
               'time_prev/'//TRIM(io_block_list(io)%name), &
@@ -323,6 +310,39 @@ CONTAINS
           c_stagger_jy, jy)
       CALL write_field(c_dump_jz, code, 'jz', 'Current/Jz', 'A/m^2', &
           c_stagger_jz, jz)
+
+#ifdef NONLINEAR_OPTICS
+      CALL write_field(c_dump_jx_nlo, code, 'jx_nlo', 'Current/Jx_nlo', 'A/m^2', &
+          c_stagger_jx_nlo, jx_nlo)
+      CALL write_field(c_dump_jy_nlo, code, 'jy_nlo', 'Current/Jy_nlo', 'A/m^2', &
+          c_stagger_jy_nlo, jy_nlo)
+      CALL write_field(c_dump_jz_nlo, code, 'jz_nlo', 'Current/Jz_nlo', 'A/m^2', &
+          c_stagger_jz_nlo, jz_nlo)
+
+      CALL write_field(c_dump_px_nlo, code, 'px_nlo', 'Polarization/Px_nlo', 'C/m^2', &
+          c_stagger_px_nlo, px_nlo)
+      CALL write_field(c_dump_py_nlo, code, 'py_nlo', 'Polarization/Py_nlo', 'C/m^2', &
+          c_stagger_py_nlo, py_nlo)
+      CALL write_field(c_dump_pz_nlo, code, 'pz_nlo', 'Polarization/Pz_nlo', 'C/m^2', &
+          c_stagger_pz_nlo, pz_nlo)
+
+      CALL write_field(c_dump_medium_mask, code, 'medium_mask', 'Medium mask', '', &
+          c_stagger_medium_mask, medium_mask)
+
+      CALL write_field(c_dump_jx_D, code, 'jx_D', 'jx_drude', 'A/m^2', &
+          c_stagger_jx_D, jx_D)
+      CALL write_field(c_dump_jy_D, code, 'jy_D', 'jy_drude', 'A/m^2', &
+          c_stagger_jy_D, jy_D)
+      CALL write_field(c_dump_jz_D, code, 'jz_D', 'jz_drude', 'A/m^2', &
+          c_stagger_jz_D, jz_D)
+      CALL write_field(c_dump_electron_density_Drude, code, &
+        'electron_density_Drude', 'electron_density_Drude', 'm^-3', &
+          c_stagger_electron_density_Drude, electron_density_Drude)
+      CALL write_field(c_dump_electron_temperature, code, &
+        'electron_temperature', 'electron_temperature', 'K', &
+          c_stagger_electron_temperature, electron_temperature)
+
+#endif
 
       IF (cpml_boundaries) THEN
         CALL sdf_write_srl(sdf_handle, 'boundary_thickness', &
@@ -530,16 +550,12 @@ CONTAINS
       IF (dump_field_grid) THEN
         IF (.NOT. use_offset_grid) THEN
           CALL sdf_write_srl_plain_mesh(sdf_handle, 'grid', 'Grid/Grid', &
-              xb_global(1:nx_global+1), yb_global(1:ny_global+1), &
-              zb_global(1:nz_global+1), convert)
+              xb_global, yb_global, zb_global, convert)
         ELSE
           CALL sdf_write_srl_plain_mesh(sdf_handle, 'grid', 'Grid/Grid', &
-              xb_offset_global(1:nx_global+1), &
-              yb_offset_global(1:ny_global+1), &
-              zb_offset_global(1:nz_global+1), convert)
+              xb_offset_global, yb_offset_global, zb_offset_global, convert)
           CALL sdf_write_srl_plain_mesh(sdf_handle, 'grid_full', &
-              'Grid/Grid_Full', xb_global(1:nx_global+1), &
-              yb_global(1:ny_global+1), zb_global(1:nz_global+1), convert)
+              'Grid/Grid_Full', xb_global, yb_global, zb_global, convert)
         ENDIF
       ENDIF
 
@@ -737,37 +753,6 @@ CONTAINS
     IF (timer_collect) CALL timer_stop(c_timer_io)
 
   END SUBROUTINE output_routines
-
-
-
-  SUBROUTINE write_laser_phases(sdf_handle, laser_count, laser_base_pointer, &
-      block_name)
-
-    TYPE(sdf_file_handle), INTENT(IN) :: sdf_handle
-    INTEGER, INTENT(IN) :: laser_count
-    TYPE(laser_block), POINTER :: laser_base_pointer
-    CHARACTER(LEN=*), INTENT(IN) :: block_name
-    REAL(num), DIMENSION(:), ALLOCATABLE :: laser_phases
-    INTEGER :: ilas
-    TYPE(laser_block), POINTER :: current_laser
-
-    IF (laser_count > 0) THEN
-      ALLOCATE(laser_phases(laser_count))
-      ilas = 1
-      current_laser => laser_base_pointer
-
-      DO WHILE(ASSOCIATED(current_laser))
-        laser_phases(ilas) = current_laser%current_integral_phase
-        ilas = ilas + 1
-        current_laser => current_laser%next
-      ENDDO
-
-      CALL sdf_write_srl(sdf_handle, TRIM(block_name), TRIM(block_name), &
-          laser_count, laser_phases, 0)
-      DEALLOCATE(laser_phases)
-    ENDIF
-
-  END SUBROUTINE write_laser_phases
 
 
 
@@ -2057,7 +2042,7 @@ CONTAINS
     INTEGER :: i, l
     TYPE(particle), POINTER :: current, next
     LOGICAL :: use_particle
-    REAL(num) :: gamma_rel, random_num, part_mc
+    REAL(num) :: gamma, random_num, part_mc
 
     IF (done_subset_init) RETURN
     done_subset_init = .TRUE.
@@ -2092,11 +2077,11 @@ CONTAINS
 #ifdef PER_PARTICLE_CHARGE_MASS
           part_mc = c * current%mass
 #endif
-          gamma_rel = SQRT(SUM((current%part_p / part_mc)**2) + 1.0_num)
+          gamma = SQRT(SUM((current%part_p / part_mc)**2) + 1.0_num)
           IF (subset_list(l)%use_gamma_min &
-              .AND. gamma_rel < subset_list(l)%gamma_min) use_particle = .FALSE.
+              .AND. gamma < subset_list(l)%gamma_min) use_particle = .FALSE.
           IF (subset_list(l)%use_gamma_max &
-              .AND. gamma_rel > subset_list(l)%gamma_max) use_particle = .FALSE.
+              .AND. gamma > subset_list(l)%gamma_max) use_particle = .FALSE.
         ENDIF
 
         IF (subset_list(l)%use_x_min &
@@ -2616,7 +2601,7 @@ CONTAINS
     seconds = INT(time) - ((days * 24 + hours) * 60 + minutes) * 60
     frac_seconds = FLOOR((time - INT(time)) * 100)
 
-    WRITE(timestring, '(i3,'':'',i2.2,'':'',i2.2,'':'',i2.2,''.'',i2.2)') &
+    WRITE(timestring, '(i2,'':'',i2.2,'':'',i2.2,'':'',i2.2,''.'',i2.2)') &
         days, hours, minutes, seconds, frac_seconds
 
   END SUBROUTINE create_timestring

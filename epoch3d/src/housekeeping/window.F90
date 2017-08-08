@@ -116,6 +116,18 @@ CONTAINS
     CALL shift_field(jy, jng)
     CALL shift_field(jz, jng)
 
+#ifdef NONLINEAR_OPTICS
+    CALL shift_field(jx_nlo, ng)
+    CALL shift_field(jy_nlo, ng)
+    CALL shift_field(jz_nlo, ng)
+
+    CALL shift_field(px_nlo, ng)
+    CALL shift_field(py_nlo, ng)
+    CALL shift_field(pz_nlo, ng)
+
+    CALL shift_field(medium_mask, ng)
+#endif
+
     IF (x_max_boundary) THEN
       DO k = -2, nz+3
         DO j = -2, ny+3
@@ -133,6 +145,22 @@ CONTAINS
           bx(nx,j,k)   = 0.5_num * (bx(nx-1,j,k) + bx(nx+1,j,k))
           by(nx-1,j,k) = 0.5_num * (by(nx-2,j,k) + by(nx,j,k))
           bz(nx-1,j,k) = 0.5_num * (bz(nx-2,j,k) + bz(nx,j,k))
+#ifdef NONLINEAR_OPTICS
+          jx_nlo(nx,j,k)   = 0.0_num
+          jx_nlo(nx+1,j,k) = 0.0_num
+          jy_nlo(nx,j,k)   = 0.0_num
+          jy_nlo(nx+1,j,k) = 0.0_num
+          jz_nlo(nx,j,k)   = 0.0_num
+          jz_nlo(nx+1,j,k) = 0.0_num
+          px_nlo(nx,j,k)   = 0.0_num
+          px_nlo(nx+1,j,k) = 0.0_num
+          py_nlo(nx,j,k)   = 0.0_num
+          py_nlo(nx+1,j,k) = 0.0_num
+          pz_nlo(nx,j,k)   = 0.0_num
+          pz_nlo(nx+1,j,k) = 0.0_num
+          medium_mask(nx,j,k)   = 1.0_num
+          medium_mask(nx+1,j,k) = 1.0_num
+#endif
         ENDDO
       ENDDO
     ENDIF

@@ -30,12 +30,8 @@ MODULE deck_control_block
   PUBLIC :: control_block_start, control_block_end
   PUBLIC :: control_block_handle_element, control_block_check
 
-  INTEGER, PARAMETER :: control_block_elements = 29 + 4 * c_ndims
+  INTEGER, PARAMETER :: control_block_elements = 32 + 4 * c_ndims
   LOGICAL, DIMENSION(control_block_elements) :: control_block_done
-  ! 3rd alias for ionisation
-  CHARACTER(LEN=string_length) :: ionization_alias = 'field_ionization'
-  INTEGER, PARAMETER :: ionisation_index = 25
-
   CHARACTER(LEN=string_length), DIMENSION(control_block_elements) :: &
       control_block_name = (/ &
           'nx                       ', &
@@ -64,6 +60,10 @@ MODULE deck_control_block
           'smooth_currents          ', &
           'field_ionisation         ', &
           'use_multiphoton          ', &
+          'use_ionRate              ', &
+          'path_ionRate_table       ', &
+          'use_mre_avalanche        ', &
+          'use_dynamic_gamma_drude  ', &
           'use_bsi                  ', &
           'particle_tstart          ', &
           'use_migration            ', &
@@ -77,8 +77,7 @@ MODULE deck_control_block
           'print_constants          ', &
           'allow_missing_restart    ', &
           'print_eta_string         ', &
-          'n_zeros                  ', &
-          'use_current_correction   ' /)
+          'n_zeros                  ' /)
   CHARACTER(LEN=string_length), DIMENSION(control_block_elements) :: &
       alternate_name = (/ &
           'nx                       ', &
@@ -107,6 +106,10 @@ MODULE deck_control_block
           'smooth_currents          ', &
           'use_field_ionise         ', &
           'multiphoton              ', &
+          'ionRate                  ', &
+          'path_ionRate_table       ', &
+          'mre_avalanche            ', &
+          'dynamic_gamma_drude      ', &
           'bsi                      ', &
           'particle_tstart          ', &
           'migrate_particles        ', &
@@ -120,8 +123,7 @@ MODULE deck_control_block
           'print_constants          ', &
           'allow_missing_restart    ', &
           'print_eta_string         ', &
-          'n_zeros                  ', &
-          'use_current_correction   ' /)
+          'n_zeros                  ' /)
 
 CONTAINS
 
@@ -136,7 +138,6 @@ CONTAINS
       print_deck_constants = .FALSE.
       allow_missing_restart = .FALSE.
       print_eta_string = .FALSE.
-      use_current_correction = .FALSE.
       restart_number = 0
       check_stop_frequency = 10
       stop_at_walltime = -1.0_num
@@ -228,11 +229,6 @@ CONTAINS
         EXIT
       ENDIF
     ENDDO
-
-    ! Adds 3rd alias just for ionisation s vs z issue
-    IF (str_cmp(element, TRIM(ADJUSTL(ionization_alias)))) THEN
-      elementselected = ionisation_index
-    ENDIF
 
     IF (elementselected == 0) RETURN
 
@@ -327,22 +323,30 @@ CONTAINS
     CASE(4*c_ndims+14)
       use_multiphoton = as_logical_print(value, element, errcode)
     CASE(4*c_ndims+15)
-      use_bsi = as_logical_print(value, element, errcode)
+      use_ionRate = as_logical_print(value, element, errcode)
     CASE(4*c_ndims+16)
-      particle_push_start_time = as_real_print(value, element, errcode)
+      path_ionRate_table = TRIM(ADJUSTL(value))
     CASE(4*c_ndims+17)
-      use_particle_migration = as_logical_print(value, element, errcode)
+      use_mre_avalanche = as_logical_print(value, element, errcode)
     CASE(4*c_ndims+18)
-      particle_migration_interval = as_integer_print(value, element, errcode)
+      use_dynamic_gamma_drude = as_logical_print(value, element, errcode)
     CASE(4*c_ndims+19)
-      use_exact_restart = as_logical_print(value, element, errcode)
+      use_bsi = as_logical_print(value, element, errcode)
     CASE(4*c_ndims+20)
-      allow_cpu_reduce = as_logical_print(value, element, errcode)
+      particle_push_start_time = as_real_print(value, element, errcode)
     CASE(4*c_ndims+21)
-      check_stop_frequency = as_integer_print(value, element, errcode)
+      use_particle_migration = as_logical_print(value, element, errcode)
     CASE(4*c_ndims+22)
-      stop_at_walltime = as_real_print(value, element, errcode)
+      particle_migration_interval = as_integer_print(value, element, errcode)
     CASE(4*c_ndims+23)
+      use_exact_restart = as_logical_print(value, element, errcode)
+    CASE(4*c_ndims+24)
+      allow_cpu_reduce = as_logical_print(value, element, errcode)
+    CASE(4*c_ndims+25)
+      check_stop_frequency = as_integer_print(value, element, errcode)
+    CASE(4*c_ndims+26)
+      stop_at_walltime = as_real_print(value, element, errcode)
+    CASE(4*c_ndims+27)
       IF (rank == 0) THEN
         OPEN(unit=lu, status='OLD', iostat=ierr, &
             file=TRIM(data_dir) // '/' // TRIM(value))
@@ -352,18 +356,16 @@ CONTAINS
         ENDIF
       ENDIF
       CALL MPI_BCAST(stop_at_walltime, 1, mpireal, 0, comm, errcode)
-    CASE(4*c_ndims+24)
-      simplify_deck = as_logical_print(value, element, errcode)
-    CASE(4*c_ndims+25)
-      print_deck_constants = as_logical_print(value, element, errcode)
-    CASE(4*c_ndims+26)
-      allow_missing_restart = as_logical_print(value, element, errcode)
-    CASE(4*c_ndims+27)
-      print_eta_string = as_logical_print(value, element, errcode)
     CASE(4*c_ndims+28)
-      n_zeros_control = as_integer_print(value, element, errcode)
+      simplify_deck = as_logical_print(value, element, errcode)
     CASE(4*c_ndims+29)
-      use_current_correction = as_logical_print(value, element, errcode)
+      print_deck_constants = as_logical_print(value, element, errcode)
+    CASE(4*c_ndims+30)
+      allow_missing_restart = as_logical_print(value, element, errcode)
+    CASE(4*c_ndims+31)
+      print_eta_string = as_logical_print(value, element, errcode)
+    CASE(4*c_ndims+32)
+      n_zeros_control = as_integer_print(value, element, errcode)
     END SELECT
 
   END FUNCTION control_block_handle_element

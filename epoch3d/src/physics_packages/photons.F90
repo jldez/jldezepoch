@@ -531,7 +531,7 @@ CONTAINS
     REAL(num) :: part_x, part_y, part_z
     REAL(num) :: part_ux, part_uy, part_uz
     REAL(num) :: dir_x, dir_y, dir_z
-    REAL(num) :: eta, chi_val, part_e, gamma_rel, norm
+    REAL(num) :: eta, chi_val, part_e, gamma, norm
 
     DO ispecies = 1, n_species
 
@@ -548,16 +548,16 @@ CONTAINS
           part_ux = current%part_p(1) / mc0
           part_uy = current%part_p(2) / mc0
           part_uz = current%part_p(3) / mc0
-          gamma_rel = SQRT(part_ux**2 + part_uy**2 + part_uz**2 + 1.0_num)
+          gamma = SQRT(part_ux**2 + part_uy**2 + part_uz**2 + 1.0_num)
 
           eta = calculate_eta(part_x, part_y, part_z, part_ux, part_uy, &
-              part_uz, gamma_rel)
+              part_uz, gamma)
 
           current%optical_depth = &
-              current%optical_depth - delta_optical_depth(eta, gamma_rel)
+              current%optical_depth - delta_optical_depth(eta, gamma)
 #ifdef TRIDENT_PHOTONS
-          current%optical_depth_tri = current%optical_depth_tri &
-              - delta_optical_depth_tri(eta, gamma_rel)
+          current%optical_depth_tri = &
+              current%optical_depth_tri - delta_optical_depth_tri(eta, gamma)
 #endif
           ! If optical depth dropped below zero generate photon...
           IF (current%optical_depth <= 0.0_num) THEN
@@ -611,35 +611,35 @@ CONTAINS
 
 
 
-  FUNCTION delta_optical_depth(eta, gamma_rel)
+  FUNCTION delta_optical_depth(eta, gamma)
 
     ! Function that calcualtes the change to the optical depth
     REAL(num) :: delta_optical_depth
-    REAL(num), INTENT(IN) :: eta, gamma_rel
+    REAL(num), INTENT(IN) :: eta, gamma
     REAL(num) :: hsokolov
 
     hsokolov = find_value_from_table_1d(eta, n_sample_h, log_hsokolov(:,1), &
         log_hsokolov(:,2))
 
     delta_optical_depth = dt * eta * alpha_f * SQRT(3.0_num) * hsokolov &
-        / (2.0_num * pi * tau_c * gamma_rel)
+        / (2.0_num * pi * tau_c * gamma)
 
   END FUNCTION delta_optical_depth
 
 
 
-  FUNCTION delta_optical_depth_tri(eta, gamma_rel)
+  FUNCTION delta_optical_depth_tri(eta, gamma)
 
     ! Function that calcualtes the change to the optical depth
     REAL(num) :: delta_optical_depth_tri
-    REAL(num), INTENT(IN) :: eta, gamma_rel
+    REAL(num), INTENT(IN) :: eta, gamma
     REAL(num) :: omegahat
 
     omegahat = find_value_from_table_1d(eta, n_sample_t, log_omegahat(:,1), &
         log_omegahat(:,2))
 
     delta_optical_depth_tri = dt * eta * alpha_f**2 * 0.64_num * omegahat &
-        / (2.0_num * pi * tau_c * gamma_rel)
+        / (2.0_num * pi * tau_c * gamma)
 
   END FUNCTION delta_optical_depth_tri
 
@@ -662,11 +662,11 @@ CONTAINS
 
 
   FUNCTION calculate_eta(part_x, part_y, part_z, part_ux, part_uy, part_uz, &
-      gamma_rel)
+      gamma)
 
     REAL(num) :: calculate_eta
     REAL(num), INTENT(IN) :: part_x, part_y, part_z
-    REAL(num), INTENT(IN) :: part_ux, part_uy, part_uz, gamma_rel
+    REAL(num), INTENT(IN) :: part_ux, part_uy, part_uz, gamma
     REAL(num) :: e_at_part(3), b_at_part(3)
     REAL(num) :: beta_x, beta_y, beta_z
     REAL(num) :: flperp(3), i_e, tau0, roland_eta
@@ -677,9 +677,9 @@ CONTAINS
     moduclip2 = MAX(part_ux**2 + part_uy**2 + part_uz**2, c_tiny)
     moduclip = SQRT(moduclip2)
 
-    beta_x = part_ux / gamma_rel
-    beta_y = part_uy / gamma_rel
-    beta_z = part_uz / gamma_rel
+    beta_x = part_ux / gamma
+    beta_y = part_uy / gamma
+    beta_z = part_uz / gamma
 
     lambdac = h_bar / mc0
 
@@ -701,7 +701,7 @@ CONTAINS
 
     tau0 = q0**2 / (6.0_num * pi * epsilon0 * m0 * c**3)
 
-    i_e = tau0 * gamma_rel**2 * (flperp(1)**2 + flperp(2)**2 + flperp(3)**2 &
+    i_e = tau0 * gamma**2 * (flperp(1)**2 + flperp(2)**2 + flperp(3)**2 &
         + (q0 * (beta_x * e_at_part(1) + beta_y * e_at_part(2) &
         + beta_z * e_at_part(3)) / moduclip)**2) / m0
 

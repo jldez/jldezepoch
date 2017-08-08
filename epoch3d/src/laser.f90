@@ -34,13 +34,11 @@ CONTAINS
     laser%use_time_function = .FALSE.
     laser%use_phase_function = .FALSE.
     laser%use_profile_function = .FALSE.
-    laser%use_omega_function = .FALSE.
     laser%amp = -1.0_num
     laser%omega = -1.0_num
     laser%pol_angle = 0.0_num
     laser%t_start = 0.0_num
     laser%t_end = t_end
-    laser%current_integral_phase = 0.0_num
     NULLIFY(laser%profile)
     NULLIFY(laser%phase)
     NULLIFY(laser%next)
@@ -54,30 +52,12 @@ CONTAINS
 
 
 
-  SUBROUTINE setup_laser_phases(laser_init, phases)
-
-    TYPE(laser_block), POINTER :: laser_init
-    REAL(num), DIMENSION(:), INTENT(IN) :: phases
-    TYPE(laser_block), POINTER :: laser
-    INTEGER :: ilas
-
-    ilas = 1
-    laser => laser_init
-    DO WHILE(ASSOCIATED(laser))
-      laser%current_integral_phase = phases(ilas)
-      ilas = ilas + 1
-      laser => laser%next
-    ENDDO
-
-  END SUBROUTINE setup_laser_phases
-
-
-
   SUBROUTINE deallocate_laser(laser)
 
     TYPE(laser_block), POINTER :: laser
 
     IF (ASSOCIATED(laser%profile)) DEALLOCATE(laser%profile)
+    IF (ASSOCIATED(laser%phase)) DEALLOCATE(laser%phase)
     IF (ASSOCIATED(laser%phase)) DEALLOCATE(laser%phase)
     IF (laser%use_profile_function) &
         CALL deallocate_stack(laser%profile_function)
@@ -85,8 +65,6 @@ CONTAINS
         CALL deallocate_stack(laser%phase_function)
     IF (laser%use_time_function) &
         CALL deallocate_stack(laser%time_function)
-    IF (laser%use_omega_function) &
-        CALL deallocate_stack(laser%omega_function)
     DEALLOCATE(laser)
 
   END SUBROUTINE deallocate_laser
@@ -152,22 +130,16 @@ CONTAINS
     boundary = laser%boundary
 
     IF (boundary == c_bd_x_min) THEN
-      n_laser_x_min = n_laser_x_min + 1
       CALL attach_laser_to_list(laser_x_min, laser)
     ELSE IF (boundary == c_bd_x_max) THEN
-      n_laser_x_max = n_laser_x_max + 1
       CALL attach_laser_to_list(laser_x_max, laser)
     ELSE IF (boundary == c_bd_y_min) THEN
-      n_laser_y_min = n_laser_y_min + 1
       CALL attach_laser_to_list(laser_y_min, laser)
     ELSE IF (boundary == c_bd_y_max) THEN
-      n_laser_y_max = n_laser_y_max + 1
       CALL attach_laser_to_list(laser_y_max, laser)
     ELSE IF (boundary == c_bd_z_min) THEN
-      n_laser_z_min = n_laser_z_min + 1
       CALL attach_laser_to_list(laser_z_min, laser)
     ELSE IF (boundary == c_bd_z_max) THEN
-      n_laser_z_max = n_laser_z_max + 1
       CALL attach_laser_to_list(laser_z_max, laser)
     ENDIF
 
@@ -259,101 +231,6 @@ CONTAINS
 
   END SUBROUTINE laser_update_profile
 
-
-
-  SUBROUTINE laser_update_omega(laser)
-
-    TYPE(laser_block), POINTER :: laser
-    INTEGER :: err
-
-    err = 0
-    laser%omega = evaluate(laser%omega_function, err)
-    IF (laser%omega_func_type == c_of_freq) &
-        laser%omega = 2.0_num * pi * laser%omega
-    IF (laser%omega_func_type == c_of_lambda) &
-        laser%omega = 2.0_num * pi * c / laser%omega
-
-  END SUBROUTINE laser_update_omega
-
-
-
-  SUBROUTINE update_laser_omegas
-
-    TYPE(laser_block), POINTER :: current
-
-    current => laser_x_min
-    DO WHILE(ASSOCIATED(current))
-      IF (current%use_omega_function) THEN
-        CALL laser_update_omega(current)
-        current%current_integral_phase = current%current_integral_phase &
-            + current%omega * dt
-      ELSE
-        current%current_integral_phase = current%omega * time
-      ENDIF
-      current => current%next
-    ENDDO
-
-    current => laser_x_max
-    DO WHILE(ASSOCIATED(current))
-      IF (current%use_omega_function) THEN
-        CALL laser_update_omega(current)
-        current%current_integral_phase = current%current_integral_phase &
-            + current%omega * dt
-      ELSE
-        current%current_integral_phase = current%omega * time
-      ENDIF
-      current => current%next
-    ENDDO
-
-    current => laser_y_min
-    DO WHILE(ASSOCIATED(current))
-      IF (current%use_omega_function) THEN
-        CALL laser_update_omega(current)
-        current%current_integral_phase = current%current_integral_phase &
-            + current%omega * dt
-      ELSE
-        current%current_integral_phase = current%omega * time
-      ENDIF
-      current => current%next
-    ENDDO
-
-    current => laser_y_max
-    DO WHILE(ASSOCIATED(current))
-      IF (current%use_omega_function) THEN
-        CALL laser_update_omega(current)
-        current%current_integral_phase = current%current_integral_phase &
-            + current%omega * dt
-      ELSE
-        current%current_integral_phase = current%omega * time
-      ENDIF
-      current => current%next
-    ENDDO
-
-    current => laser_z_min
-    DO WHILE(ASSOCIATED(current))
-      IF (current%use_omega_function) THEN
-        CALL laser_update_omega(current)
-        current%current_integral_phase = current%current_integral_phase &
-            + current%omega * dt
-      ELSE
-        current%current_integral_phase = current%omega * time
-      ENDIF
-      current => current%next
-    ENDDO
-
-    current => laser_z_max
-    DO WHILE(ASSOCIATED(current))
-      IF (current%use_omega_function) THEN
-        CALL laser_update_omega(current)
-        current%current_integral_phase = current%current_integral_phase &
-            + current%omega * dt
-      ELSE
-        current%current_integral_phase = current%omega * time
-      ENDIF
-      current => current%next
-    ENDDO
-
-  END SUBROUTINE update_laser_omegas
 
 
 
@@ -492,7 +369,7 @@ CONTAINS
           DO j = 1,nz
           DO i = 1,ny
             base = t_env * current%profile(i,j) &
-              * SIN(current%current_integral_phase + current%phase(i,j))
+              * SIN(current%omega * time + current%phase(i,j))
             source1(i,j) = source1(i,j) + base * COS(current%pol_angle)
             source2(i,j) = source2(i,j) + base * SIN(current%pol_angle)
           ENDDO
@@ -548,8 +425,11 @@ CONTAINS
     lx = dtc2 / dx
     ly = dtc2 / dy
     lz = dtc2 / dz
-    sum = 1.0_num / (lx + c)
-    diff = lx - c
+
+    ! Right now, x_max always assumes to be at chi1
+    sum = 1.0_num / (lx + c/(1.0_num+chi1)**0.5_num)
+    diff = (lx - c/(1.0_num+chi1)**0.5_num)
+
     dt_eps = dt / epsilon0
 
     ALLOCATE(source1(ny,nz))
@@ -570,7 +450,7 @@ CONTAINS
           DO j = 1,nz
           DO i = 1,ny
             base = t_env * current%profile(i,j) &
-              * SIN(current%current_integral_phase + current%phase(i,j))
+              * SIN(current%omega * time + current%phase(i,j))
             source1(i,j) = source1(i,j) + base * COS(current%pol_angle)
             source2(i,j) = source2(i,j) + base * SIN(current%pol_angle)
           ENDDO
@@ -648,7 +528,7 @@ CONTAINS
           DO j = 1,nz
           DO i = 1,nx
             base = t_env * current%profile(i,j) &
-              * SIN(current%current_integral_phase + current%phase(i,j))
+              * SIN(current%omega * time + current%phase(i,j))
             source1(i,j) = source1(i,j) + base * COS(current%pol_angle)
             source2(i,j) = source2(i,j) + base * SIN(current%pol_angle)
           ENDDO
@@ -726,7 +606,7 @@ CONTAINS
           DO j = 1,nz
           DO i = 1,nx
             base = t_env * current%profile(i,j) &
-              * SIN(current%current_integral_phase + current%phase(i,j))
+              * SIN(current%omega * time + current%phase(i,j))
             source1(i,j) = source1(i,j) + base * COS(current%pol_angle)
             source2(i,j) = source2(i,j) + base * SIN(current%pol_angle)
           ENDDO
@@ -804,7 +684,7 @@ CONTAINS
           DO j = 1,ny
           DO i = 1,nx
             base = t_env * current%profile(i,j) &
-              * SIN(current%current_integral_phase + current%phase(i,j))
+              * SIN(current%omega * time + current%phase(i,j))
             source1(i,j) = source1(i,j) + base * COS(current%pol_angle)
             source2(i,j) = source2(i,j) + base * SIN(current%pol_angle)
           ENDDO
@@ -882,7 +762,7 @@ CONTAINS
           DO j = 1,ny
           DO i = 1,nx
             base = t_env * current%profile(i,j) &
-              * SIN(current%current_integral_phase + current%phase(i,j))
+              * SIN(current%omega * time + current%phase(i,j))
             source1(i,j) = source1(i,j) + base * COS(current%pol_angle)
             source2(i,j) = source2(i,j) + base * SIN(current%pol_angle)
           ENDDO
