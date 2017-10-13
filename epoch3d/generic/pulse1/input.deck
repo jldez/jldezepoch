@@ -1,0 +1,91 @@
+begin:control
+#	nx = 150
+#	ny = 160
+#	nz = 3
+
+# final time of simulation
+#	t_end = 30 * femto
+	stdout_frequency = 1000
+	dt_multiplier = 0.95
+
+# size of domain
+	x_min = 0.0
+#	x_max = 0.3 * micron
+	y_min = 0.0
+#	y_max = 1.6 * micron
+	z_min = 0.0
+#	z_max = 1.6 * micron
+
+# ionization
+	field_ionisation = T
+	use_multiphoton = F
+	use_ionRate = T
+#	path_ionRate_table = silica_800_3_10
+	use_mre_avalanche = T
+	use_dynamic_gamma_drude = T
+# randomness
+	use_random_seed = F
+end:control
+
+begin:boundaries
+	bc_x_min = simple_laser
+	bc_x_max = simple_outflow
+	bc_y_min = periodic
+	bc_y_max = periodic
+	bc_z_min = periodic
+	bc_z_max = periodic
+end:boundaries
+
+begin:laser
+	boundary = x_min
+#	intensity_w_cm2 = intensity_w_cm2_laser
+#	lambda = lambda_laser
+#	t_profile = gauss(time,15*femto,10*femto)
+end:laser
+
+begin:nonlinear_optics
+#	path_medium_mask = silica_800_3_10/pulse1
+#	path_rho_incubation = silica_800_3_10/pulse1
+
+	nlo_x_min = 0.05 * micron
+	nlo_x_max = x_max + 0.01*micron
+	nlo_y_min = y_min
+	nlo_y_max = y_max
+	nlo_z_min = z_min
+	nlo_z_max = z_max
+	rug_thickness = 0.0 * micron
+
+#	resonance = 120.0e-9
+#	gamma = 0.0e15
+#	chi1 = 1.1025
+#	chi2 = 0.0
+#	chi3 = 2.0e-22
+#	gamma_D = 1.0e15
+#	bandGap_drude = 9.0*ev
+#	avalanche_factor = 0.001
+#	atom_density = 2.2011e28
+#	atom_cross_section = 6.608e-20
+#	effective_mass_electron = 1.0
+#	effective_mass_hole = 1.0
+#	recombination_rate = 0.0
+#	omega_laser = 2.35e15
+#	amp_laser = 3e10
+end:nonlinear_optics
+
+begin:output
+#	dt_snapshot = 0.25 * femto
+	ez = always
+	ex = always
+	ey = always
+	electron_density_Drude = always
+	electron_density_sfi = always
+	electron_density_col = always
+	medium_mask = always
+	electron_temperature = always
+	dynamic_gamma_drude = always
+	g_ee = always
+	g_ep = always
+	g_en = always
+	g_ei = always
+	g_max = always
+end:output
