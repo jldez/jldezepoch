@@ -622,15 +622,20 @@ CONTAINS
     medium_mask(INT(nlo_x_min/dx):INT(nlo_x_max/dx),:,:) = 1.0_num
     ! WARNING : The definition above assumes that x_min = 0 in deck file.
 
-    ! Generate surface roughness
-    nr = INT(nlo_x_min/dx)
-    do mm_i = 0,ny
+    ! Generate surface roughness (random thickness at every surface coordinates)
+    IF (rug_thickness .GT. 0.0_num) THEN
+      nr = INT(nlo_x_min/dx)
+      do mm_i = 0,ny
         do mm_j = 0,nz
           r_nb = random()
           ns = INT(r_nb*rug_thickness/dx)
           medium_mask(nr-ns:nr,mm_i,mm_j) = 1.0_num
         end do
-    end do
+      end do
+    ENDIF
+
+    ! single surface inhomogeneity at center
+    ! medium_mask(nr-10:nr,ny/2,nz/2) = 1.0_num
 
     !-------------------------------------------------------------------------- 
     ! Load medium_mask from file
