@@ -694,7 +694,6 @@ CONTAINS
     IF (gamma_D .GE. 0.0_num) THEN
 
       use_Drude = .TRUE.
-      ALLOCATE(dynamic_gamma_drude(nx,ny,nz))
       DO mm_i = 1, nx
         DO mm_j = 1, ny
           DO mm_k = 1, nz
