@@ -433,7 +433,15 @@ CONTAINS
     ALLOCATE(jz_mpi(1-ng:nx+ng, 1-ng:ny+ng, 1-ng:nz+ng))
     ALLOCATE(omega_p(1-ng:nx+ng, 1-ng:ny+ng, 1-ng:nz+ng))
     ALLOCATE(electron_density_Drude(1-ng:nx+ng, 1-ng:ny+ng, 1-ng:nz+ng))
+    ALLOCATE(electron_density_sfi(1-ng:nx+ng, 1-ng:ny+ng, 1-ng:nz+ng))
+    ALLOCATE(electron_density_col(1-ng:nx+ng, 1-ng:ny+ng, 1-ng:nz+ng))
     ALLOCATE(electron_temperature(1-ng:nx+ng, 1-ng:ny+ng, 1-ng:nz+ng))
+    ALLOCATE(dynamic_gamma_drude(1-ng:nx+ng, 1-ng:ny+ng, 1-ng:nz+ng))
+    ALLOCATE(g_ee(1-ng:nx+ng, 1-ng:ny+ng, 1-ng:nz+ng))
+    ALLOCATE(g_ep(1-ng:nx+ng, 1-ng:ny+ng, 1-ng:nz+ng))
+    ALLOCATE(g_en(1-ng:nx+ng, 1-ng:ny+ng, 1-ng:nz+ng))
+    ALLOCATE(g_ei(1-ng:nx+ng, 1-ng:ny+ng, 1-ng:nz+ng))
+    ALLOCATE(g_max(1-ng:nx+ng, 1-ng:ny+ng, 1-ng:nz+ng))
     ALLOCATE(rho_incubation(1-ng:nx+ng, 1-ng:ny+ng, 1-ng:nz+ng))
 #endif
 

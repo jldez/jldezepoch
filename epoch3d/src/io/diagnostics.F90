@@ -338,9 +338,28 @@ CONTAINS
       CALL write_field(c_dump_electron_density_Drude, code, &
         'electron_density_Drude', 'electron_density_Drude', 'm^-3', &
           c_stagger_electron_density_Drude, electron_density_Drude)
+      CALL write_field(c_dump_electron_density_sfi, code, &
+        'electron_density_sfi', 'electron_density_sfi', 'm^-3', &
+          c_stagger_electron_density_sfi, electron_density_sfi)
+      CALL write_field(c_dump_electron_density_col, code, &
+        'electron_density_col', 'electron_density_col', 'm^-3', &
+          c_stagger_electron_density_col, electron_density_col)
       CALL write_field(c_dump_electron_temperature, code, &
         'electron_temperature', 'electron_temperature', 'K', &
           c_stagger_electron_temperature, electron_temperature)
+      CALL write_field(c_dump_dynamic_gamma_drude, code, &
+        'dynamic_gamma_drude', 'dynamic_gamma_drude', 's^-1', &
+          c_stagger_dynamic_gamma_drude, dynamic_gamma_drude)
+      CALL write_field(c_dump_g_ee, code, &
+        'g_ee', 'g_ee', 's^-1', c_stagger_g_ee, g_ee)
+      CALL write_field(c_dump_g_ep, code, &
+        'g_ep', 'g_ep', 's^-1', c_stagger_g_ep, g_ep)
+      CALL write_field(c_dump_g_en, code, &
+        'g_en', 'g_en', 's^-1', c_stagger_g_en, g_en)
+      CALL write_field(c_dump_g_ei, code, &
+        'g_ei', 'g_ei', 's^-1', c_stagger_g_ei, g_ei)
+      CALL write_field(c_dump_g_max, code, &
+        'g_max', 'g_max', 's^-1', c_stagger_g_max, g_max)
 
 #endif
 

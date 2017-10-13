@@ -105,6 +105,14 @@ CONTAINS
     io_block_name (c_dump_jy_D             ) = 'jy_D'
     io_block_name (c_dump_jz_D             ) = 'jz_D'
     io_block_name (c_dump_electron_density_Drude) = 'electron_density_Drude'
+    io_block_name (c_dump_dynamic_gamma_drude) = 'dynamic_gamma_drude'
+    io_block_name (c_dump_g_ee) = 'g_ee'
+    io_block_name (c_dump_g_ep) = 'g_ep'
+    io_block_name (c_dump_g_en) = 'g_en'
+    io_block_name (c_dump_g_ei) = 'g_ei'
+    io_block_name (c_dump_g_max) = 'g_max'
+    io_block_name (c_dump_electron_density_sfi) = 'electron_density_sfi'
+    io_block_name (c_dump_electron_density_col) = 'electron_density_col'
     io_block_name (c_dump_electron_temperature) = 'electron_temperature'
 #endif
     io_block_name (c_dump_ekbar            ) = 'ekbar'
@@ -917,8 +925,24 @@ CONTAINS
         IOR(io_block%dumpmask(c_dump_jz_D), c_io_restartable)
     io_block%dumpmask(c_dump_electron_density_Drude) = &
         IOR(io_block%dumpmask(c_dump_electron_density_Drude), c_io_restartable)
+    io_block%dumpmask(c_dump_electron_density_sfi) = &
+        IOR(io_block%dumpmask(c_dump_electron_density_sfi), c_io_restartable)
+    io_block%dumpmask(c_dump_electron_density_col) = &
+        IOR(io_block%dumpmask(c_dump_electron_density_col), c_io_restartable)
     io_block%dumpmask(c_dump_electron_temperature) = &
         IOR(io_block%dumpmask(c_dump_electron_temperature), c_io_restartable)
+    io_block%dumpmask(c_dump_dynamic_gamma_drude) = &
+        IOR(io_block%dumpmask(c_dump_dynamic_gamma_drude), c_io_restartable)
+    io_block%dumpmask(c_dump_g_ee) = &
+        IOR(io_block%dumpmask(c_dump_g_ee), c_io_restartable)
+    io_block%dumpmask(c_dump_g_ep) = &
+        IOR(io_block%dumpmask(c_dump_g_ep), c_io_restartable)
+    io_block%dumpmask(c_dump_g_en) = &
+        IOR(io_block%dumpmask(c_dump_g_en), c_io_restartable)
+    io_block%dumpmask(c_dump_g_ei) = &
+        IOR(io_block%dumpmask(c_dump_g_ei), c_io_restartable)
+    io_block%dumpmask(c_dump_g_max) = &
+        IOR(io_block%dumpmask(c_dump_g_max), c_io_restartable)
 #endif
     ! CPML boundaries
     io_block%dumpmask(c_dump_cpml_psi_eyx) = &

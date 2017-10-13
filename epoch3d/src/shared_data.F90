@@ -242,7 +242,15 @@ MODULE constants
   INTEGER, PARAMETER :: c_stagger_jy_mpi = c_stagger_jy
   INTEGER, PARAMETER :: c_stagger_jz_mpi = c_stagger_jz
   INTEGER, PARAMETER :: c_stagger_electron_density_Drude = c_stagger_cell_centre
+  INTEGER, PARAMETER :: c_stagger_electron_density_sfi = c_stagger_cell_centre
+  INTEGER, PARAMETER :: c_stagger_electron_density_col = c_stagger_cell_centre
   INTEGER, PARAMETER :: c_stagger_electron_temperature = c_stagger_cell_centre
+  INTEGER, PARAMETER :: c_stagger_dynamic_gamma_drude = c_stagger_cell_centre
+  INTEGER, PARAMETER :: c_stagger_g_ee = c_stagger_cell_centre
+  INTEGER, PARAMETER :: c_stagger_g_ep = c_stagger_cell_centre
+  INTEGER, PARAMETER :: c_stagger_g_en = c_stagger_cell_centre
+  INTEGER, PARAMETER :: c_stagger_g_ei = c_stagger_cell_centre
+  INTEGER, PARAMETER :: c_stagger_g_max = c_stagger_cell_centre
 #endif
 
   ! Length of a standard string
@@ -726,6 +734,16 @@ MODULE shared_data
   INTEGER, PARAMETER :: c_dump_jy_mpi            = 67
   INTEGER, PARAMETER :: c_dump_jz_mpi            = 68
   INTEGER, PARAMETER :: c_dump_electron_density_Drude = 69
+  INTEGER, PARAMETER :: c_dump_electron_density_sfi = 70
+  INTEGER, PARAMETER :: c_dump_electron_density_col = 71
+  INTEGER, PARAMETER :: c_dump_electron_temperature = 72
+  INTEGER, PARAMETER :: c_dump_dynamic_gamma_drude = 73
+  INTEGER, PARAMETER :: c_dump_g_ee = 74
+  INTEGER, PARAMETER :: c_dump_g_ep = 75
+  INTEGER, PARAMETER :: c_dump_g_en = 76
+  INTEGER, PARAMETER :: c_dump_g_ei = 77
+  INTEGER, PARAMETER :: c_dump_g_max = 78
+  INTEGER, PARAMETER :: num_vars_to_dump         = 78
   INTEGER, PARAMETER :: c_dump_electron_temperature = 70
   INTEGER, PARAMETER :: num_vars_to_dump         = 70
 #else
@@ -1065,9 +1083,12 @@ MODULE shared_data
   REAL(num) :: rug_thickness
 
   REAL(num), ALLOCATABLE, DIMENSION(:,:,:) :: dynamic_gamma_drude
+  REAL(num), ALLOCATABLE, DIMENSION(:,:,:) :: g_ee,g_ep,g_en,g_ei,g_max
   REAL(num), ALLOCATABLE, DIMENSION(:,:,:) :: jx_D, jy_D, jz_D
   REAL(num), ALLOCATABLE, DIMENSION(:,:,:) :: jx_mpi, jy_mpi, jz_mpi
   REAL(num), ALLOCATABLE, DIMENSION(:,:,:) :: omega_p, electron_density_Drude
+  REAL(num), ALLOCATABLE, DIMENSION(:,:,:) :: electron_density_sfi
+  REAL(num), ALLOCATABLE, DIMENSION(:,:,:) :: electron_density_col
 
   INTEGER :: mre_nb_levels
   REAL(num) :: drude_cross_section,mre_critical_energy
