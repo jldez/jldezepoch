@@ -744,8 +744,6 @@ MODULE shared_data
   INTEGER, PARAMETER :: c_dump_g_ei = 77
   INTEGER, PARAMETER :: c_dump_g_max = 78
   INTEGER, PARAMETER :: num_vars_to_dump         = 78
-  INTEGER, PARAMETER :: c_dump_electron_temperature = 70
-  INTEGER, PARAMETER :: num_vars_to_dump         = 70
 #else
   INTEGER, PARAMETER :: num_vars_to_dump         = 55
 #endif
@@ -1076,7 +1074,7 @@ MODULE shared_data
 
   REAL(num) :: gamma_D, omega_p_static, bandGap_drude
   REAL(num) :: effective_mass_electron, effective_mass_hole,reduced_mass
-  REAL(num) :: atom_density,avalanche_factor
+  REAL(num) :: atom_density,atom_cross_section,avalanche_factor
   REAL(num) :: recombination_rate,omega_laser,amp_laser
 
   ! This is the number of comp. cells in which surface roughness is confined

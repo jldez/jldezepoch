@@ -749,10 +749,12 @@ CONTAINS
 
       reflectance = (((1.0_num+chi1)**0.5_num -1.0_num) &
         /((1.0_num+chi1)**0.5_num +1.0_num))**2.0_num
-      amp_laser = amp_laser/((1.0_num+chi1)**0.25)*(1.0_num - reflectance)
+      amp_laser = amp_laser/((1.0_num+chi1)**0.25)
 
-      ponderomotive_energy = (q0*amp_laser)**2.0/(4.0*reduced_mass*m0*omega_laser**2.0)
-      mre_critical_energy = (1.0_num + reduced_mass)*(bandGap_drude+ponderomotive_energy)
+      ponderomotive_energy = (q0*amp_laser)**2.0 &
+        /(4.0*reduced_mass*m0*omega_laser**2.0)*(1.0_num - reflectance)
+      mre_critical_energy = (1.0_num + reduced_mass/effective_mass_hole) &
+        *(bandGap_drude+ponderomotive_energy)
 
       mre_nb_levels = CEILING(mre_critical_energy/(h_bar*omega_laser))
 
