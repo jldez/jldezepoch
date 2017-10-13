@@ -10,4 +10,3 @@ USE_DATA_DIRECTORY
 epoch[1,2,3]d.dat
 deck.status
 __pycache__
-*.py[cod]
